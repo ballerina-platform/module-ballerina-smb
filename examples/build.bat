@@ -44,13 +44,13 @@ for /d %%D in ("%BAL_CENTRAL_DIR%\cache-*") do (
 echo Successfully cleaned the cache directories
 
 :: Create the package directory in the central repository
-if not exist "%BAL_CENTRAL_DIR%\bala\ballerinax\%BAL_PACKAGE_NAME%" (
-    mkdir "%BAL_CENTRAL_DIR%\bala\ballerinax\%BAL_PACKAGE_NAME%"
+if not exist "%BAL_CENTRAL_DIR%\bala\ballerina\%BAL_PACKAGE_NAME%" (
+    mkdir "%BAL_CENTRAL_DIR%\bala\ballerina\%BAL_PACKAGE_NAME%"
 )
 
 :: Update the central repository
-set BAL_DESTINATION_DIR=%BAL_CENTRAL_DIR%\bala\ballerinax\%BAL_PACKAGE_NAME%
-set BAL_SOURCE_DIR=%USERPROFILE%\.ballerina\repositories\local\bala\ballerinax\%BAL_PACKAGE_NAME%
+set BAL_DESTINATION_DIR=%BAL_CENTRAL_DIR%\bala\ballerina\%BAL_PACKAGE_NAME%
+set BAL_SOURCE_DIR=%USERPROFILE%\.ballerina\repositories\local\bala\ballerina\%BAL_PACKAGE_NAME%
 if exist "%BAL_DESTINATION_DIR%" (
     rmdir /s /q "%BAL_DESTINATION_DIR%"
 )

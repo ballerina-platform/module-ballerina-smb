@@ -1,6 +1,6 @@
 # Examples
 
-The `ballerinax/smb` connector provides practical examples illustrating usage in various scenarios.
+The `ballerina/smb` connector provides practical examples illustrating usage in various scenarios.
 
 [//]: # (TODO: Add examples)
 1. 

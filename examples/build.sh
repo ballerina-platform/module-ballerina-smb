@@ -53,8 +53,8 @@ echo "Successfully cleaned the cache directories."
 
 # Create the package directory in the central repository
 echo "Updating the central repository..."
-BAL_DESTINATION_DIR="$BAL_CENTRAL_DIR/bala/ballerinax/$BAL_PACKAGE_NAME"
-BAL_SOURCE_DIR="$HOME/.ballerina/repositories/local/bala/ballerinax/$BAL_PACKAGE_NAME"
+BAL_DESTINATION_DIR="$BAL_CENTRAL_DIR/bala/ballerina/$BAL_PACKAGE_NAME"
+BAL_SOURCE_DIR="$HOME/.ballerina/repositories/local/bala/ballerina/$BAL_PACKAGE_NAME"
 mkdir -p "$BAL_DESTINATION_DIR"
 if [[ -d "$BAL_DESTINATION_DIR" ]]; then
   rm -r "$BAL_DESTINATION_DIR"
