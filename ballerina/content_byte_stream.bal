@@ -53,11 +53,11 @@ public class ContentByteStream {
 
 isolated function externGetContentStreamEntry(ContentByteStream iterator)
         returns record {|byte[] value;|}|error? = @java:Method {
-    'class: "io.ballerina.stdlib.smb.ByteIteratorUtils",
+    'class: "io.ballerina.stdlib.smb.iterator.ByteIterator",
     name: "next"
 } external;
 
 isolated function externCloseContentStream(ContentByteStream iterator) returns error? = @java:Method {
-    'class: "io.ballerina.stdlib.smb.ByteIteratorUtils",
+    'class: "io.ballerina.stdlib.smb.iterator.ByteIterator",
     name: "close"
 } external;

@@ -53,11 +53,11 @@ public class ContentCsvStringArrayStream {
 
 isolated function externGetContentCsvStreamEntry(ContentCsvStringArrayStream iterator)
         returns record {|string[] value;|}|error? = @java:Method {
-    'class: "io.ballerina.stdlib.smb.CsvIteratorUtils",
+    'class: "io.ballerina.stdlib.smb.iterator.CsvIterator",
     name: "next"
 } external;
 
 isolated function externCloseContentCsvStream(ContentCsvStringArrayStream iterator) returns error? = @java:Method {
-    'class: "io.ballerina.stdlib.smb.CsvIteratorUtils",
+    'class: "io.ballerina.stdlib.smb.iterator.CsvIterator",
     name: "close"
 } external;
