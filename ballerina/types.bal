@@ -152,71 +152,26 @@ public annotation FunctionConfiguration FunctionConfig on function;
 
 # SMB service for handling file system change events.
 #
-# The listener supports the following content handler methods that automatically deserialize file content:
-# - `onFileText(string content, FileInfo fileInfo, Caller caller)` - Handle text files
-# - `onFileJson(json content, FileInfo fileInfo, Caller caller)` - Handle JSON files
-# - `onFileXml(xml content, FileInfo fileInfo, Caller caller)` - Handle XML files
-# - `onFileCsv(string[][]|record{}[]|stream<string[], error?>|stream<record{}, error?> content, FileInfo fileInfo, Caller caller)` - Handle CSV files
-# - `onFile(byte[]|stream<byte[], error?> content, FileInfo fileInfo, Caller caller)` - Handle any files (fallback)
-# - `onError(error err)` - Handle errors during listener operations
-#
-# The `fileInfo` and `caller` parameters are optional and can be omitted if not needed.
-# The first row of CSV files is expected to contain column headers when using record types.
-#
-# File extension-based routing: `.txt` → `onFileText`, `.json` → `onFileJson`,
-# `.xml` → `onFileXml`, `.csv` → `onFileCsv`, other extensions → `onFile`.
-# Use `@smb:FunctionConfig` annotation to specify custom file name patterns for each handler.
 public type Service distinct service object {
-
-
-    // # Invoked when text files (.txt) are added to the monitored directory.
-    // #
-    // # + content - Text content of the file
-    // # + fileInfo - Metadata about the file
-    // # + return - `()` or else an `error` upon failure to process the file
-    // remote function onFileText(string content, FileInfo fileInfo) returns error?;
-
-    // # Invoked when JSON files (.json) are added to the monitored directory.
-    // #
-    // # + content - JSON content of the file (can be typed to a record for automatic deserialization)
-    // # + fileInfo - Metadata about the file
-    // # + return - `()` or else an `error` upon failure to process the file
-    // remote function onFileJson(json content, FileInfo fileInfo) returns error?;
-
-    // # Invoked when XML files (.xml) are added to the monitored directory.
-    // #
-    // # + content - XML content of the file (can be typed to a record for automatic deserialization)
-    // # + fileInfo - Metadata about the file
-    // # + return - `()` or else an `error` upon failure to process the file
-    // remote function onFileXml(xml content, FileInfo fileInfo) returns error?;
-
-    // # Invoked when CSV files (.csv) are added to the monitored directory.
-    // # Supported content types:
-    // # - `string[][]` - In-memory array of string arrays (all rows at once)
-    // # - `record{}[]` - In-memory array of records (type-safe, auto data-bound using headers as field names)
-    // # - `stream<string[], error?>` - Streaming string arrays (memory-efficient for large files)
-    // # - `stream<record{}, error?>` - Streaming records (type-safe and memory-efficient)
-    // #
-    // # The first row of CSV files is expected to contain column headers when using record types.
-    // # The `fileInfo` and `caller` parameters are optional.
-    // #
-    // # + content - CSV content in one of the supported types
-    // # + fileInfo - Metadata about the file (optional)
-    // # + caller - SMB caller for file operations (optional)
-    // # + return - `()` or else an `error` upon failure to process the file
-    // remote function onFileCsv(string[][]|record{}[]|stream<string[], error?>|stream<record{}, error?> content, FileInfo fileInfo, Caller caller) returns error?;
-
-    // # Invoked for any file type as a fallback handler.
-    // #
-    // # + content - File content as byte array or stream
-    // # + fileInfo - Metadata about the file
-    // # + return - `()` or else an `error` upon failure to process the file
-    // remote function onFile(byte[] content, FileInfo fileInfo) returns error?;
-
-
-    // # Invoked when an error occurs during listener operations.
-    // #
-    // # + err - The error that occurred
-    // # + return - `()` or else an `error` upon failure to handle the error
-    // public isolated function onError(error err) returns error?;
 };
+
+# Record returned from the `next` method in `ContentByteStream`.
+#
+# + value - The array of bytes
+public type ContentStreamEntry record {|
+    byte[] value;
+|};
+
+# Record returned from the `next` method in `ContentCsvStringArrayStream`.
+#
+# + value - The array of strings representing a CSV row
+public type ContentCsvStringArrayStreamEntry record {|
+    string[] value;
+|};
+
+# Record returned from the `next` method in `ContentCsvRecordStream`.
+#
+# + value - The record deserialized from a CSV row
+public type ContentCsvRecordStreamEntry record {|
+    record {} value;
+|};
