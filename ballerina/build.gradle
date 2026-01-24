@@ -18,7 +18,9 @@
 
 import org.apache.tools.ant.taskdefs.condition.Os
 
+
 plugins {
+    id 'com.github.psxpaul.execfork'
     id 'io.ballerina.plugin'
 }
 
