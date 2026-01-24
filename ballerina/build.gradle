@@ -29,6 +29,7 @@ def packageOrg = "ballerina"
 def tomlVersion = stripBallerinaExtensionVersion("${project.version}")
 def ballerinaTomlFilePlaceHolder = new File("${project.rootDir}/build-config/resources/Ballerina.toml")
 def ballerinaTomlFile = new File("$project.projectDir/Ballerina.toml")
+def testUtilExecutable = ""
 
 def stripBallerinaExtensionVersion(String extVersion) {
     if (extVersion.matches(project.ext.timestampedVersionRegex)) {
@@ -47,16 +48,73 @@ def stripBallerinaExtensionVersion(String extVersion) {
 ballerina {
     packageOrganization = packageOrg
     module = packageName
-    testCoverageParam = "--code-coverage --coverage-format=xml"
-    isConnector = true
-    platform = "any"
+    langVersion = ballerinaLangVersion
+}
+
+configurations {
+    externalJars
+}
+
+dependencies {
+    externalJars(group: 'com.hierynomus', name: 'smbj', version: "${smbjVersion}") {
+        transitive = false
+    }
+    externalJars(group: 'com.hierynomus', name: 'asn-one', version: '0.6.0') {
+        transitive = false
+    }
+    externalJars(group: 'net.engio', name: 'mbassador', version: '1.3.2') {
+        transitive = false
+    }
+    externalJars(group: 'org.bouncycastle', name: 'bcprov-jdk15on', version: "${bouncycastleVersion}") {
+        transitive = false
+    }
+    externalJars(group: 'eu.agno3.jcifs', name: 'jcifs-ng', version: "${jcifsVersion}") {
+        transitive = false
+    }
+    externalJars(group: 'org.slf4j', name: 'slf4j-api', version: "${slf4jVersion}") {
+        transitive = false
+    }
+    externalJars(group: 'org.apache.commons', name: 'commons-lang3', version: "${commonsLang3Version}") {
+        transitive = false
+    }
+    externalJars(group: 'commons-io', name: 'commons-io', version: "${commonsIoVersion}") {
+        transitive = false
+    }
+    externalJars(group: 'org.apache.commons', name: 'commons-vfs2', version: "${commonsVfs2Version}") {
+        transitive = false
+    }
+
+    externalJars(group: 'io.ballerina.lib', name: 'data.jsondata-native', version: "${stdlibDataJsonDataVersion}") {
+        transitive = false
+    }
+    externalJars(group: 'io.ballerina.lib', name: 'data.xmldata-native', version: "${stdlibDataXmlDataVersion}") {
+        transitive = false
+    }
+    externalJars(group: 'io.ballerina.lib', name: 'data.csv-native', version: "${stdlibDataCsvVersion}") {
+        transitive = false
+    }
 }
 
 task updateTomlFiles {
     doLast {
-        def newBallerinaToml = ballerinaTomlFilePlaceHolder.text.replace("@project.version@", project.version)
-        newBallerinaToml = newBallerinaToml.replace("@toml.version@", tomlVersion)
-        ballerinaTomlFile.text = newBallerinaToml
+        def stdlibDependentSmbjVersion = project.smbjVersion
+        def stdlibDependentBouncycastleVersion = project.bouncycastleVersion
+        def stdlibDependentJcifsVersion = project.jcifsVersion
+        def stdlibDependentCommonsIoVersion = project.commonsIoVersion
+        def stdlibDependentCommonsLang3Version = project.commonsLang3Version
+
+        def newConfig = ballerinaTomlFilePlaceHolder.text.replace("@project.version@", project.version)
+        newConfig = newConfig.replace("@toml.version@", tomlVersion)
+        newConfig = newConfig.replace("@smbj.version@", stdlibDependentSmbjVersion)
+        newConfig = newConfig.replace("@bouncycastle.version@", stdlibDependentBouncycastleVersion)
+        newConfig = newConfig.replace("@jcifs.version@", stdlibDependentJcifsVersion)
+        newConfig = newConfig.replace("@commons.io.version@", stdlibDependentCommonsIoVersion)
+        newConfig = newConfig.replace("@commons.lang3.version@", stdlibDependentCommonsLang3Version)
+        newConfig = newConfig.replace("@data.jsondata.version@", stdlibDataJsonDataVersion)
+        newConfig = newConfig.replace("@data.xmldata.version@", stdlibDataXmlDataVersion)
+        newConfig = newConfig.replace("@data.csv.version@", stdlibDataCsvVersion)
+
+        ballerinaTomlFile.text = newConfig
     }
 }
 
@@ -65,11 +123,59 @@ task commitTomlFiles {
         project.exec {
             ignoreExitValue true
             if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-                commandLine 'cmd', '/c', "git commit -m \"[Automated] Update the toml files\" Ballerina.toml Dependencies.toml"
+                commandLine 'cmd', '/c', "git commit -m \"[Automated] Update the native jar versions\" Ballerina.toml Dependencies.toml CompilerPlugin.toml"
             } else {
-                commandLine 'sh', '-c', "git commit -m '[Automated] Update the toml files' Ballerina.toml Dependencies.toml"
+                commandLine 'sh', '-c', "git commit -m '[Automated] Update the native jar versions' Ballerina.toml Dependencies.toml CompilerPlugin.toml"
             }
         }
+    }
+}
+
+task populateTestUtilExecutableName() {
+    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+        testUtilExecutable = "$projectDir/tests/resources/startJava.bat"
+    } else {
+        testUtilExecutable = "$projectDir/tests/resources/startJava.sh"
+    }
+}
+
+task startTestUtilAsDaemon(type: com.github.psxpaul.task.ExecFork) {
+    executable = testUtilExecutable
+    workingDir = "$projectDir"
+    standardOutput = new File("$buildDir/tempUtilLogs.log")
+}
+
+task startSmbDockerServer(type: Exec) {
+    description = 'Start Docker SMB server using docker compose'
+    group = 'docker'
+
+    workingDir = "${project.rootDir}"
+
+    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+        commandLine 'cmd', '/c', 'docker', 'compose', 'up', '-d', '--wait'
+    } else {
+        commandLine 'sh', '-c', 'docker compose up -d --wait'
+    }
+
+    doLast {
+        println "SMB Docker server started successfully"
+    }
+}
+
+task stopSmbDockerServer(type: Exec) {
+    description = 'Stop Docker SMB server using docker compose'
+    group = 'docker'
+
+    workingDir = "${project.rootDir}"
+
+    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+        commandLine 'cmd', '/c', 'docker', 'compose', 'down', '-v'
+    } else {
+        commandLine 'sh', '-c', 'docker compose down -v'
+    }
+
+    doLast {
+        println "SMB Docker server stopped successfully"
     }
 }
 
@@ -79,6 +185,7 @@ publishing {
             artifact source: createArtifactZip, extension: 'zip'
         }
     }
+
     repositories {
         maven {
             name = "GitHubPackages"
@@ -91,10 +198,17 @@ publishing {
     }
 }
 
-clean {
-    delete 'build'
-}
+updateTomlFiles.dependsOn copyStdlibs
 
+tasks.generatePomFileForMavenPublication.dependsOn(startTestUtilAsDaemon)
+tasks.copyToLib.dependsOn(startTestUtilAsDaemon)
 build.dependsOn "generatePomFileForMavenPublication"
+build.dependsOn ":${packageName}-native:build"
+test.dependsOn ":${packageName}-native:build"
+startTestUtilAsDaemon.dependsOn populateTestUtilExecutableName
+test.dependsOn startTestUtilAsDaemon
+test.dependsOn startSmbDockerServer
+test.finalizedBy stopSmbDockerServer
+
 publishToMavenLocal.dependsOn build
 publish.dependsOn build
