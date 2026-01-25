@@ -150,6 +150,17 @@ public type FunctionConfiguration record {|
 # Annotation to configure content handler function behavior.
 public annotation FunctionConfiguration FunctionConfig on function;
 
+# Provides a set of configurations for the SMB service.
+#
+# + path - The directory path within the SMB share that this service should listen to.
+#          If not specified, the service name will be used as the path.
+public type SmbServiceConfig record {|
+    string path?;
+|};
+
+# The annotation to configure an SMB service.
+public annotation SmbServiceConfig ServiceConfig on service;
+
 # SMB service for handling file system change events.
 #
 public type Service distinct service object {

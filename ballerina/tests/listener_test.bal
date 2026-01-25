@@ -84,7 +84,10 @@ listener Listener stopListener = check new ({
     bufferSize: 65536
 });
 
-service "ListenerTest1" on smbListener {
+@ServiceConfig {
+    path: "ListenerTest1"
+}
+service "test1" on smbListener {
     remote function onFileText(string content, FileInfo fileInfo) returns error? {
         io:println("Resource - File created: ", fileInfo.name);
         createCounter += 1;

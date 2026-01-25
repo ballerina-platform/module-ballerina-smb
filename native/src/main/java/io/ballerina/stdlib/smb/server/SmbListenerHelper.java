@@ -41,6 +41,7 @@ import io.ballerina.runtime.api.types.MethodType;
 import io.ballerina.runtime.api.types.ObjectType;
 import io.ballerina.runtime.api.types.Parameter;
 import io.ballerina.runtime.api.types.PredefinedTypes;
+import io.ballerina.runtime.api.types.ServiceType;
 import io.ballerina.runtime.api.types.StreamType;
 import io.ballerina.runtime.api.types.TupleType;
 import io.ballerina.runtime.api.types.Type;
@@ -123,6 +124,8 @@ public class SmbListenerHelper {
     private static final String EXT_XML = "xml";
     private static final String EXT_CSV = "csv";
     private static final String FUNCTION_CONFIG = "FunctionConfig";
+    private static final String SERVICE_CONFIG = "ServiceConfig";
+    private static final String PATH_KEY = "path";
     private static final String FILE_NAME_PATTERN = "fileNamePattern";
     private static final String FILE_INFO = "FileInfo";
     public static final String INITIALIZE_SMB_LISTENER_ERROR = "Failed to initialize SMB listener: ";
@@ -172,12 +175,7 @@ public class SmbListenerHelper {
             if (services == null) {
                 return SmbUtil.createError(LISTENER_NOT_INITIALIZED_ERROR, SMB_ERROR);
             }
-            String path;
-            if (name == null) {
-                path = SLASH_SUFFIX;
-            } else {
-                path = ((BString) name).getValue();
-            }
+            String path = getServicePath(smbService, name);
             path = normalizePath(path);
             SmbService registration = new SmbService(smbService, path);
             services.add(registration);
@@ -185,6 +183,33 @@ public class SmbListenerHelper {
         } catch (Exception e) {
             return SmbUtil.createError(REGISTER_SERVICE_ERROR + e.getMessage(), SMB_ERROR);
         }
+    }
+
+    private static String getServicePath(BObject smbService, Object name) {
+        Type serviceType = TypeUtils.getReferredType(TypeUtils.getType(smbService));
+        if (serviceType instanceof ServiceType) {
+            BMap<BString, Object> serviceConfig = getServiceConfig((ServiceType) serviceType);
+            if (serviceConfig != null) {
+                BString pathValue = serviceConfig.getStringValue(StringUtils.fromString(PATH_KEY));
+                if (pathValue != null && !pathValue.getValue().isEmpty()) {
+                    return pathValue.getValue();
+                }
+            }
+        }
+        if (name == null) {
+            return SLASH_SUFFIX;
+        }
+        return ((BString) name).getValue();
+    }
+
+    private static BMap<BString, Object> getServiceConfig(ServiceType serviceType) {
+        BString packageName = StringUtils.fromString(ModuleUtils.getModule().toString());
+        BString serviceConfigName = StringUtils.fromString(SERVICE_CONFIG);
+        Object annotation = serviceType.getAnnotation(packageName, serviceConfigName);
+        if (annotation == null) {
+            return null;
+        }
+        return (BMap<BString, Object>) annotation;
     }
 
     private static String normalizePath(String path) {
