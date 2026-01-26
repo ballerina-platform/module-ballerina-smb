@@ -147,6 +147,17 @@ task startTestUtilAsDaemon(type: com.github.psxpaul.task.ExecFork) {
     standardOutput = new File("$buildDir/tempUtilLogs.log")
 }
 
+def isSmbServerRunning() {
+    try {
+        def process = ['docker', 'compose', 'ps', '--status', 'running', '-q'].execute(null, new File("${project.rootDir}"))
+        process.waitFor()
+        def output = process.text.trim()
+        return !output.isEmpty()
+    } catch (Exception e) {
+        return false
+    }
+}
+
 task startSmbDockerServer() {
     doLast {
         if (!Os.isFamily(Os.FAMILY_WINDOWS)) {
@@ -201,6 +212,9 @@ startTestUtilAsDaemon.dependsOn populateTestUtilExecutableName
 test.dependsOn startTestUtilAsDaemon
 test.dependsOn startSmbDockerServer
 test.finalizedBy stopSmbDockerServer
+test.onlyIf {
+    isSmbServerRunning()
+}
 
 publishToMavenLocal.dependsOn build
 publish.dependsOn build
