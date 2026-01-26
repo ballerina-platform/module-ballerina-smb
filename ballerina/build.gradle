@@ -147,37 +147,27 @@ task startTestUtilAsDaemon(type: com.github.psxpaul.task.ExecFork) {
     standardOutput = new File("$buildDir/tempUtilLogs.log")
 }
 
-task startSmbDockerServer(type: Exec) {
-    description = 'Start Docker SMB server using docker compose'
-    group = 'docker'
-
-    workingDir = "${project.rootDir}"
-
-    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-        commandLine 'cmd', '/c', 'docker', 'compose', 'up', '-d', '--wait'
-    } else {
-        commandLine 'sh', '-c', 'docker compose up -d --wait'
-    }
-
+task startSmbDockerServer() {
     doLast {
-        println "SMB Docker server started successfully"
+        if (!Os.isFamily(Os.FAMILY_WINDOWS)) {
+            exec {
+                workingDir = "${project.rootDir}"
+                commandLine 'sh', '-c', 'docker compose up -d --wait'
+            }
+            println "SMB Docker server started successfully"
+        }
     }
 }
 
-task stopSmbDockerServer(type: Exec) {
-    description = 'Stop Docker SMB server using docker compose'
-    group = 'docker'
-
-    workingDir = "${project.rootDir}"
-
-    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-        commandLine 'cmd', '/c', 'docker', 'compose', 'down', '-v'
-    } else {
-        commandLine 'sh', '-c', 'docker compose down -v'
-    }
-
+task stopSmbDockerServer() {
     doLast {
-        println "SMB Docker server stopped successfully"
+        if (!Os.isFamily(Os.FAMILY_WINDOWS)) {
+            exec {
+                workingDir = "${project.rootDir}"
+                commandLine 'sh', '-c', 'docker compose down -v'
+            }
+            println "SMB Docker server stopped successfully"
+        }
     }
 }
 
