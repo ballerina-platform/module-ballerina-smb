@@ -648,8 +648,10 @@ public class SmbClient {
             BMap<?, ?> kerberosConfig = (BMap<?, ?>) clientEndpoint.getNativeData(KERBEROS_CONFIG);
             String principal = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_PRINCIPAL)).getValue();
             BString realmValue = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_REALM));
-            String keytabPath = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_KEYTAB)).getValue();
-            String configFile = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_CONFIG_FILE)).getValue();
+            BString keytabValue = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_KEYTAB));
+            String keytabPath = keytabValue != null ? keytabValue.getValue() : null;
+            BString configFileValue = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_CONFIG_FILE));
+            String configFile = configFileValue != null ? configFileValue.getValue() : null;
 
             String realm;
             if (realmValue != null && !realmValue.getValue().isEmpty()) {
