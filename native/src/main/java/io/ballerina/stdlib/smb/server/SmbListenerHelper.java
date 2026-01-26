@@ -121,7 +121,6 @@ public class SmbListenerHelper {
     public static final String ENDPOINT_CONFIG_CREDENTIALS = "credentials";
     public static final String KERBEROS_CONFIG = "kerberosConfig";
     public static final String KERBEROS_PRINCIPAL = "principal";
-    public static final String KERBEROS_REALM = "realm";
     public static final String KERBEROS_KEYTAB = "keytab";
     public static final String KERBEROS_CONFIG_FILE = "configFile";
     public static final String KERBEROS_AUTH_CONTEXT_ERROR = "Failed to create Kerberos authentication context: ";
@@ -819,23 +818,13 @@ public class SmbListenerHelper {
                                                                     String password, String domain) {
         try {
             String principal = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_PRINCIPAL)).getValue();
-            BString realmValue = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_REALM));
             BString keytabBStr = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_KEYTAB));
             BString configFileBStr = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_CONFIG_FILE));
             String keytabPath = keytabBStr != null ? keytabBStr.getValue() : null;
             String configFile = configFileBStr != null ? configFileBStr.getValue() : null;
 
-            String realm;
-            if (realmValue != null && !realmValue.getValue().isEmpty()) {
-                realm = realmValue.getValue();
-            } else if (principal.contains("@")) {
-                realm = principal.substring(principal.indexOf('@') + 1);
-            } else {
-                realm = domain != null ? domain.toUpperCase() : "";
-            }
-            String kerberosUsername = principal.contains("@")
-                    ? principal.substring(0, principal.indexOf('@'))
-                    : principal;
+            String realm = principal.substring(principal.indexOf('@') + 1);
+            String kerberosUsername = principal.substring(0, principal.indexOf('@'));
 
             setKerberosSystemProperties(configFile);
 

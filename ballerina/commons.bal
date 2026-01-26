@@ -29,13 +29,11 @@ public type Credentials record {|
 
 # Kerberos authentication configuration.
 #
-# + principal - Kerberos principal name (e.g., user@REALM.COM)
-# + realm - Kerberos realm (e.g., REALM.COM). If not specified, extracted from principal
+# + principal - Kerberos principal name in user@REALM format (e.g., user@EXAMPLE.COM)
 # + keytab - Path to the keytab file for authentication (optional, uses password if not provided)
 # + configFile - Path to the Kerberos configuration file (krb5.conf)
 public type KerberosConfig record {|
     string principal;
-    string realm?;
     string keytab?;
     string configFile?;
 |};

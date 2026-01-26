@@ -114,7 +114,6 @@ public class SmbClient {
     public static final String AUTH_TYPE_ANONYMOUS = "ANONYMOUS";
     public static final String KERBEROS_CONFIG = "kerberosConfig";
     public static final String KERBEROS_PRINCIPAL = "principal";
-    public static final String KERBEROS_REALM = "realm";
     public static final String KERBEROS_KEYTAB = "keytab";
     public static final String KERBEROS_CONFIG_FILE = "configFile";
     public static final String SMB_CONNECTION = "SmbConnection";
@@ -647,23 +646,13 @@ public class SmbClient {
         try {
             BMap<?, ?> kerberosConfig = (BMap<?, ?>) clientEndpoint.getNativeData(KERBEROS_CONFIG);
             String principal = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_PRINCIPAL)).getValue();
-            BString realmValue = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_REALM));
             BString keytabValue = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_KEYTAB));
             String keytabPath = keytabValue != null ? keytabValue.getValue() : null;
             BString configFileValue = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_CONFIG_FILE));
             String configFile = configFileValue != null ? configFileValue.getValue() : null;
 
-            String realm;
-            if (realmValue != null && !realmValue.getValue().isEmpty()) {
-                realm = realmValue.getValue();
-            } else if (principal.contains("@")) {
-                realm = principal.substring(principal.indexOf('@') + 1);
-            } else {
-                realm = domain.toUpperCase();
-            }
-            String kerberosUsername = principal.contains("@")
-                    ? principal.substring(0, principal.indexOf('@'))
-                    : principal;
+            String realm = principal.substring(principal.indexOf('@') + 1);
+            String kerberosUsername = principal.substring(0, principal.indexOf('@'));
             setKerberosSystemProperties(configFile);
 
             Subject subject = (keytabPath != null && !keytabPath.isEmpty())
