@@ -20,7 +20,6 @@ import org.apache.tools.ant.taskdefs.condition.Os
 
 
 plugins {
-    id 'com.github.psxpaul.execfork'
     id 'io.ballerina.plugin'
 }
 
@@ -31,8 +30,6 @@ def packageOrg = "ballerina"
 def tomlVersion = stripBallerinaExtensionVersion("${project.version}")
 def ballerinaTomlFilePlaceHolder = new File("${project.rootDir}/build-config/resources/Ballerina.toml")
 def ballerinaTomlFile = new File("$project.projectDir/Ballerina.toml")
-def testUtilExecutable = ""
-
 def stripBallerinaExtensionVersion(String extVersion) {
     if (extVersion.matches(project.ext.timestampedVersionRegex)) {
         def splitVersion = extVersion.split('-')
@@ -133,20 +130,6 @@ task commitTomlFiles {
     }
 }
 
-task populateTestUtilExecutableName() {
-    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-        testUtilExecutable = "$projectDir/tests/resources/startJava.bat"
-    } else {
-        testUtilExecutable = "$projectDir/tests/resources/startJava.sh"
-    }
-}
-
-task startTestUtilAsDaemon(type: com.github.psxpaul.task.ExecFork) {
-    executable = testUtilExecutable
-    workingDir = "$projectDir"
-    standardOutput = new File("$buildDir/tempUtilLogs.log")
-}
-
 def isSmbServerRunning() {
     try {
         def process = ['docker', 'compose', 'ps', '--status', 'running', '-q'].execute(null, new File("${project.rootDir}"))
@@ -203,13 +186,9 @@ publishing {
 
 updateTomlFiles.dependsOn copyStdlibs
 
-tasks.generatePomFileForMavenPublication.dependsOn(startTestUtilAsDaemon)
-tasks.copyToLib.dependsOn(startTestUtilAsDaemon)
 build.dependsOn "generatePomFileForMavenPublication"
 build.dependsOn ":${packageName}-native:build"
 test.dependsOn ":${packageName}-native:build"
-startTestUtilAsDaemon.dependsOn populateTestUtilExecutableName
-test.dependsOn startTestUtilAsDaemon
 test.dependsOn startSmbDockerServer
 test.finalizedBy stopSmbDockerServer
 test.onlyIf {

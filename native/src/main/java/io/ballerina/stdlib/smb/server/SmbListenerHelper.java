@@ -26,6 +26,7 @@ import com.hierynomus.mssmb2.SMB2ShareAccess;
 import com.hierynomus.protocol.commons.EnumWithValue;
 import com.hierynomus.smbj.SMBClient;
 import com.hierynomus.smbj.auth.AuthenticationContext;
+import com.hierynomus.smbj.auth.GSSAuthenticationContext;
 import com.hierynomus.smbj.connection.Connection;
 import com.hierynomus.smbj.session.Session;
 import com.hierynomus.smbj.share.DiskShare;
@@ -76,6 +77,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import javax.security.auth.Subject;
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.NameCallback;
+import javax.security.auth.callback.PasswordCallback;
+import javax.security.auth.login.AppConfigurationEntry;
+import javax.security.auth.login.Configuration;
+import javax.security.auth.login.LoginContext;
+import javax.security.auth.login.LoginException;
+
 import static io.ballerina.stdlib.smb.client.SmbClient.ACCESSED_AT;
 import static io.ballerina.stdlib.smb.client.SmbClient.CREATED_AT;
 import static io.ballerina.stdlib.smb.client.SmbClient.EXTENSION;
@@ -109,10 +120,16 @@ public class SmbListenerHelper {
     public static final String ENDPOINT_CONFIG_CREDENTIALS = "credentials";
     public static final String KERBEROS_CONFIG = "kerberosConfig";
     public static final String KERBEROS_PRINCIPAL = "principal";
+    public static final String KERBEROS_REALM = "realm";
     public static final String KERBEROS_KEYTAB = "keytab";
     public static final String KERBEROS_CONFIG_FILE = "configFile";
+    public static final String KERBEROS_AUTH_CONTEXT_ERROR = "Failed to create Kerberos authentication context: ";
     private static final String LISTENER_SERVICES = "LISTENER_SERVICES";
     private static final String LISTENER_PREVIOUS_FILES = "LISTENER_PREVIOUS_FILES";
+    private static final String LISTENER_SMB_CLIENT = "LISTENER_SMB_CLIENT";
+    private static final String LISTENER_CONNECTION = "LISTENER_CONNECTION";
+    private static final String LISTENER_SESSION = "LISTENER_SESSION";
+    private static final String LISTENER_DISK_SHARE = "LISTENER_DISK_SHARE";
     public static final String SMB_SERVICE_ENDPOINT_CONFIG = "serviceEndpointConfig";
     private static final String ON_FILE_TEXT = "onFileText";
     private static final String ON_FILE_JSON = "onFileJson";
@@ -255,6 +272,7 @@ public class SmbListenerHelper {
     }
 
     public static Object cleanup(BObject listenerEndpoint) {
+        closeExistingResources(listenerEndpoint);
         List<SmbService> services =
             (List<SmbService>) listenerEndpoint.getNativeData(LISTENER_SERVICES);
         if (services != null) {
@@ -270,40 +288,7 @@ public class SmbListenerHelper {
 
     private static void checkForFileChanges(Environment env, BObject listenerEndpoint,
                                             BMap<BString, Object> config) throws IOException {
-        String host = config.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_HOST)).getValue();
-        String share = config.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_SHARE)).getValue();
-        int port = config.getIntValue(StringUtils.fromString(ENDPOINT_CONFIG_PORT)).intValue();
-        BMap<?, ?> authConfig = config.getMapValue(StringUtils.fromString(ENDPOINT_CONFIG_AUTH));
-        SMBClient smbClient = new SMBClient();
-        Connection connection = smbClient.connect(host, port);
-        AuthenticationContext authContext;
-        if (authConfig == null) {
-            authContext = AuthenticationContext.anonymous();
-        } else {
-            BMap<?, ?> credentials = authConfig.getMapValue(StringUtils.fromString(ENDPOINT_CONFIG_CREDENTIALS));
-            if (credentials == null) {
-                authContext = AuthenticationContext.anonymous();
-            } else {
-                String username =
-                        credentials.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_USERNAME)).getValue();
-                String password =
-                        credentials.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_PASS_KEY)).getValue();
-                BString domainBStr = credentials.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_DOMAIN));
-                String domain = domainBStr != null ? domainBStr.getValue() : null;
-                BMap<?, ?> kerberosConfig = authConfig.getMapValue(StringUtils.fromString(KERBEROS_CONFIG));
-                if (kerberosConfig != null) {
-                    authContext = createKerberosAuthContext(kerberosConfig, username, domain);
-                } else {
-                    authContext = new AuthenticationContext(
-                            username,
-                            password != null ? password.toCharArray() : new char[0],
-                            domain
-                    );
-                }
-            }
-        }
-        Session session = connection.authenticate(authContext);
-        DiskShare diskShare = (DiskShare) session.connectShare(share);
+        DiskShare diskShare = getOrCreateDiskShare(listenerEndpoint, config);
         List<SmbService> services =
                 (List<SmbService>) listenerEndpoint.getNativeData(LISTENER_SERVICES);
         if (services == null || services.isEmpty()) {
@@ -316,6 +301,80 @@ public class SmbListenerHelper {
         }
         for (String path : pathsToMonitor) {
             checkPathForChanges(env, listenerEndpoint, diskShare, path, services, config);
+        }
+    }
+
+    private static DiskShare getOrCreateDiskShare(BObject listenerEndpoint,
+                                                   BMap<BString, Object> config) throws IOException {
+        DiskShare existingShare = (DiskShare) listenerEndpoint.getNativeData(LISTENER_DISK_SHARE);
+        Connection existingConnection = (Connection) listenerEndpoint.getNativeData(LISTENER_CONNECTION);
+        if (existingShare != null && existingConnection != null && existingConnection.isConnected()) {
+            return existingShare;
+        }
+        closeExistingResources(listenerEndpoint);
+        String host = config.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_HOST)).getValue();
+        String share = config.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_SHARE)).getValue();
+        int port = config.getIntValue(StringUtils.fromString(ENDPOINT_CONFIG_PORT)).intValue();
+        BMap<?, ?> authConfig = config.getMapValue(StringUtils.fromString(ENDPOINT_CONFIG_AUTH));
+        AuthenticationContext authContext = createAuthContext(authConfig);
+        SMBClient smbClient = new SMBClient();
+        Connection connection = smbClient.connect(host, port);
+        Session session = connection.authenticate(authContext);
+        DiskShare diskShare = (DiskShare) session.connectShare(share);
+        listenerEndpoint.addNativeData(LISTENER_SMB_CLIENT, smbClient);
+        listenerEndpoint.addNativeData(LISTENER_CONNECTION, connection);
+        listenerEndpoint.addNativeData(LISTENER_SESSION, session);
+        listenerEndpoint.addNativeData(LISTENER_DISK_SHARE, diskShare);
+        return diskShare;
+    }
+
+    private static AuthenticationContext createAuthContext(BMap<?, ?> authConfig) {
+        if (authConfig == null) {
+            return AuthenticationContext.anonymous();
+        }
+        BMap<?, ?> credentials = authConfig.getMapValue(StringUtils.fromString(ENDPOINT_CONFIG_CREDENTIALS));
+        if (credentials == null) {
+            return AuthenticationContext.anonymous();
+        }
+        String username =
+                credentials.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_USERNAME)).getValue();
+        String password =
+                credentials.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_PASS_KEY)).getValue();
+        BString domainBStr = credentials.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_DOMAIN));
+        String domain = domainBStr != null ? domainBStr.getValue() : null;
+        BMap<?, ?> kerberosConfig = authConfig.getMapValue(StringUtils.fromString(KERBEROS_CONFIG));
+        if (kerberosConfig != null) {
+            return createKerberosAuthContext(kerberosConfig, password, domain);
+        }
+        return new AuthenticationContext(
+                username,
+                password != null ? password.toCharArray() : new char[0],
+                domain
+        );
+    }
+
+    private static void closeExistingResources(BObject listenerEndpoint) {
+        DiskShare diskShare = (DiskShare) listenerEndpoint.getNativeData(LISTENER_DISK_SHARE);
+        Session session = (Session) listenerEndpoint.getNativeData(LISTENER_SESSION);
+        Connection connection = (Connection) listenerEndpoint.getNativeData(LISTENER_CONNECTION);
+        SMBClient smbClient = (SMBClient) listenerEndpoint.getNativeData(LISTENER_SMB_CLIENT);
+        closeQuietly(diskShare);
+        closeQuietly(session);
+        closeQuietly(connection);
+        closeQuietly(smbClient);
+        listenerEndpoint.addNativeData(LISTENER_DISK_SHARE, null);
+        listenerEndpoint.addNativeData(LISTENER_SESSION, null);
+        listenerEndpoint.addNativeData(LISTENER_CONNECTION, null);
+        listenerEndpoint.addNativeData(LISTENER_SMB_CLIENT, null);
+    }
+
+    private static void closeQuietly(AutoCloseable closeable) {
+        if (closeable != null) {
+            try {
+                closeable.close();
+            } catch (Exception e) {
+                log.debug("Error closing resource: {}", e.getMessage());
+            }
         }
     }
 
@@ -432,7 +491,7 @@ public class SmbListenerHelper {
         String handlerMethod = getHandlerMethodForExtension(extension);
         if (handlerMethod != null && hasMethod(serviceType, handlerMethod)) {
             MethodType method = getMethod(serviceType, handlerMethod);
-            if (method != null && matchesFilePattern(method, fileInfo)) {
+            if (method != null && matchesFilePattern(method, fileInfo, listenerConfig)) {
                 invokeContentHandler(env, service, method, handlerMethod, filePath, fileInfo, diskShare,
                         listenerConfig);
                 return;
@@ -440,7 +499,7 @@ public class SmbListenerHelper {
         }
         if (hasMethod(serviceType, ON_FILE)) {
             MethodType method = getMethod(serviceType, ON_FILE);
-            if (method != null && matchesFilePattern(method, fileInfo)) {
+            if (method != null && matchesFilePattern(method, fileInfo, listenerConfig)) {
                 invokeContentHandler(env, service, method, ON_FILE, filePath, fileInfo, diskShare,
                         listenerConfig);
             }
@@ -475,17 +534,26 @@ public class SmbListenerHelper {
         return null;
     }
 
-    private static boolean matchesFilePattern(MethodType method, BMap<BString, Object> fileInfo) {
+    private static boolean matchesFilePattern(MethodType method, BMap<BString, Object> fileInfo,
+                                               BMap<BString, Object> listenerConfig) {
+        String pattern = null;
         BMap<BString, Object> annotations = (BMap<BString, Object>) method.getAnnotation(
                 StringUtils.fromString(ModuleUtils.getModule().toString() + COLON + FUNCTION_CONFIG));
-        if (annotations == null) {
+        if (annotations != null) {
+            BString patternValue = annotations.getStringValue(StringUtils.fromString(FILE_NAME_PATTERN));
+            if (patternValue != null) {
+                pattern = patternValue.getValue();
+            }
+        }
+        if (pattern == null && listenerConfig != null) {
+            BString listenerPatternValue = listenerConfig.getStringValue(StringUtils.fromString(FILE_NAME_PATTERN));
+            if (listenerPatternValue != null) {
+                pattern = listenerPatternValue.getValue();
+            }
+        }
+        if (pattern == null) {
             return true;
         }
-        BString patternValue = annotations.getStringValue(StringUtils.fromString(FILE_NAME_PATTERN));
-        if (patternValue == null) {
-            return true;
-        }
-        String pattern = patternValue.getValue();
         String fileName = fileInfo.getStringValue(NAME).getValue();
         try {
             return Pattern.matches(pattern, fileName);
@@ -548,27 +616,26 @@ public class SmbListenerHelper {
             String normalizedPath = filePath.startsWith(SLASH_SUFFIX) ? filePath.substring(1) : filePath;
             Set<AccessMask> accessMask = new HashSet<>();
             accessMask.add(AccessMask.GENERIC_READ);
-            File file = diskShare.openFile(normalizedPath, accessMask, null,
+            try (File file = diskShare.openFile(normalizedPath, accessMask, null,
                     SMB2ShareAccess.ALL, SMB2CreateDisposition.FILE_OPEN, null);
+                 InputStream inputStream = file.getInputStream()) {
+                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                byte[] buffer = new byte[ARRAY_SIZE];
+                int bytesRead;
+                while ((bytesRead = inputStream.read(buffer)) != -1) {
+                    outputStream.write(buffer, 0, bytesRead);
+                }
+                byte[] bytes = outputStream.toByteArray();
 
-            InputStream inputStream = file.getInputStream();
-            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            byte[] buffer = new byte[ARRAY_SIZE];
-            int bytesRead;
-            while ((bytesRead = inputStream.read(buffer)) != -1) {
-                outputStream.write(buffer, 0, bytesRead);
+                return switch (methodName) {
+                    case ON_FILE_TEXT -> StringUtils.fromString(new String(bytes, StandardCharsets.UTF_8));
+                    case ON_FILE_JSON -> parseJsonContent(bytes, contentParamType);
+                    case ON_FILE_XML -> parseXmlContent(bytes, contentParamType);
+                    case ON_FILE_CSV -> parseCsvContent(env, bytes, contentParamType);
+                    case ON_FILE -> parseByteContent(bytes, contentParamType);
+                    default -> ValueCreator.createArrayValue(bytes);
+                };
             }
-            byte[] bytes = outputStream.toByteArray();
-            inputStream.close();
-
-            return switch (methodName) {
-                case ON_FILE_TEXT -> StringUtils.fromString(new String(bytes, StandardCharsets.UTF_8));
-                case ON_FILE_JSON -> parseJsonContent(bytes, contentParamType);
-                case ON_FILE_XML -> parseXmlContent(bytes, contentParamType);
-                case ON_FILE_CSV -> parseCsvContent(env, bytes, contentParamType);
-                case ON_FILE -> parseByteContent(bytes, contentParamType);
-                default -> ValueCreator.createArrayValue(bytes);
-            };
         } catch (IOException e) {
             return SmbUtil.createError(FILE_READ_ERROR + e.getMessage(), SMB_ERROR);
         }
@@ -726,22 +793,137 @@ public class SmbListenerHelper {
     }
 
     private static AuthenticationContext createKerberosAuthContext(BMap<?, ?> kerberosConfig,
-                                                                    String username, String domain) {
-        String principal = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_PRINCIPAL)).getValue();
-        BString keytabBStr = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_KEYTAB));
-        BString configFileBStr = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_CONFIG_FILE));
-        String keytabPath = keytabBStr != null ? keytabBStr.getValue() : null;
-        String configFile = configFileBStr != null ? configFileBStr.getValue() : null;
-        if (configFile != null) {
+                                                                    String password, String domain) {
+        try {
+            String principal = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_PRINCIPAL)).getValue();
+            BString realmValue = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_REALM));
+            BString keytabBStr = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_KEYTAB));
+            BString configFileBStr = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_CONFIG_FILE));
+            String keytabPath = keytabBStr != null ? keytabBStr.getValue() : null;
+            String configFile = configFileBStr != null ? configFileBStr.getValue() : null;
+
+            String realm;
+            if (realmValue != null && !realmValue.getValue().isEmpty()) {
+                realm = realmValue.getValue();
+            } else if (principal.contains("@")) {
+                realm = principal.substring(principal.indexOf('@') + 1);
+            } else {
+                realm = domain != null ? domain.toUpperCase() : "";
+            }
+            String kerberosUsername = principal.contains("@")
+                    ? principal.substring(0, principal.indexOf('@'))
+                    : principal;
+
+            setKerberosSystemProperties(configFile);
+
+            Subject subject = (keytabPath != null && !keytabPath.isEmpty())
+                    ? loginWithKeytab(principal, keytabPath)
+                    : (password != null && !password.isEmpty())
+                    ? loginWithPassword(principal, password)
+                    : loginWithTicketCache(principal);
+
+            log.debug("Using Kerberos authentication for principal: {}", principal);
+            return new GSSAuthenticationContext(kerberosUsername, realm, subject, null);
+        } catch (Exception e) {
+            throw new RuntimeException(KERBEROS_AUTH_CONTEXT_ERROR + e.getMessage(), e);
+        }
+    }
+
+    private static void setKerberosSystemProperties(String configFile) {
+        if (configFile != null && !configFile.isEmpty()) {
             System.setProperty("java.security.krb5.conf", configFile);
         }
-        if (keytabPath != null) {
-            log.debug("Using Kerberos authentication with keytab for principal: {}", principal);
-            return new AuthenticationContext(principal, keytabPath.toCharArray(), domain);
-        } else {
-            log.debug("Using Kerberos authentication for principal: {}", principal);
-            return new AuthenticationContext(principal, new char[0], domain);
-        }
+        System.setProperty("javax.security.auth.useSubjectCredsOnly", "false");
+    }
+
+    private static Subject loginWithKeytab(String principal, String keytabPath) throws LoginException {
+        Configuration jaasConfig = new Configuration() {
+            @Override
+            public AppConfigurationEntry[] getAppConfigurationEntry(String name) {
+                Map<String, String> options = new HashMap<>();
+                options.put("useKeyTab", "true");
+                options.put("keyTab", keytabPath);
+                options.put("storeKey", "true");
+                options.put("doNotPrompt", "true");
+                options.put("principal", principal);
+                options.put("debug", String.valueOf(log.isDebugEnabled()));
+
+                return new AppConfigurationEntry[]{
+                        new AppConfigurationEntry("com.sun.security.auth.module.Krb5LoginModule",
+                                AppConfigurationEntry.LoginModuleControlFlag.REQUIRED, options
+                        )
+                };
+            }
+        };
+        LoginContext loginContext = new LoginContext("SmbKerberosListener", null, null, jaasConfig);
+        loginContext.login();
+        log.debug("Kerberos login with keytab successful for principal: {}", principal);
+        return loginContext.getSubject();
+    }
+
+    private static Subject loginWithPassword(String principal, String password) throws LoginException {
+        Configuration jaasConfig = new Configuration() {
+            @Override
+            public AppConfigurationEntry[] getAppConfigurationEntry(String name) {
+                Map<String, String> options = new HashMap<>();
+                options.put("useTicketCache", "false");
+                options.put("renewTGT", "false");
+                options.put("doNotPrompt", "false");
+                options.put("storeKey", "true");
+                options.put("debug", String.valueOf(log.isDebugEnabled()));
+
+                return new AppConfigurationEntry[]{
+                        new AppConfigurationEntry(
+                                "com.sun.security.auth.module.Krb5LoginModule",
+                                AppConfigurationEntry.LoginModuleControlFlag.REQUIRED,
+                                options
+                        )
+                };
+            }
+        };
+
+        CallbackHandler callbackHandler = callbacks -> {
+            for (Callback callback : callbacks) {
+                if (callback instanceof NameCallback) {
+                    ((NameCallback) callback).setName(principal);
+                } else if (callback instanceof PasswordCallback) {
+                    ((PasswordCallback) callback).setPassword(password.toCharArray());
+                }
+            }
+        };
+
+        LoginContext loginContext = new LoginContext("SmbKerberosListener", null, callbackHandler, jaasConfig);
+        loginContext.login();
+        log.debug("Kerberos login with password successful for principal: {}", principal);
+        return loginContext.getSubject();
+    }
+
+    private static Subject loginWithTicketCache(String principal) throws LoginException {
+        Configuration jaasConfig = new Configuration() {
+            @Override
+            public AppConfigurationEntry[] getAppConfigurationEntry(String name) {
+                Map<String, String> options = new HashMap<>();
+                options.put("useTicketCache", "true");
+                options.put("renewTGT", "true");
+                options.put("doNotPrompt", "true");
+                options.put("storeKey", "false");
+                options.put("principal", principal);
+                options.put("debug", String.valueOf(log.isDebugEnabled()));
+
+                return new AppConfigurationEntry[]{
+                        new AppConfigurationEntry(
+                                "com.sun.security.auth.module.Krb5LoginModule",
+                                AppConfigurationEntry.LoginModuleControlFlag.REQUIRED,
+                                options
+                        )
+                };
+            }
+        };
+
+        LoginContext loginContext = new LoginContext("SmbKerberosListener", null, null, jaasConfig);
+        loginContext.login();
+        log.debug("Kerberos login with ticket cache successful for principal: {}", principal);
+        return loginContext.getSubject();
     }
 
     private static BArray createUtcTuple(long epochMillis) {

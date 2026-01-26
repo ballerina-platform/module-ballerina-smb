@@ -773,7 +773,7 @@ function testOnFileByteStreamHandler() returns error? {
 
     check byteStreamListener.immediateStop();
     test:assertTrue(binaryStreamCounter >= 1, "onFile with stream<byte[]> should be triggered at least once");
-    test:assertTrue(binaryStreamChunkCount == 1, "Stream should have processed at least 2 chunks");
+    test:assertTrue(binaryStreamChunkCount == 1, "Stream should have processed exactly 1 chunk");
     test:assertTrue(binaryStreamTotalBytes >= 20000, "Stream should have processed all bytes");
     test:assertEquals(capturedBinaryStreamFileName, "large_binary.dat", "File name should match");
     error? result = smbClient->rmdir("content_tests");
