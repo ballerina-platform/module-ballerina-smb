@@ -365,7 +365,6 @@ Service binaryStreamService = service object {
 };
 
 @test:Config {
-    groups: ["z"]
 }
 function testOnFileTextHandler() returns error? {
     textFileCounter = 0;
@@ -391,23 +390,18 @@ function testOnFileTextHandler() returns error? {
     check contentListener.'start();
     runtime:registerListener(contentListener);
 
-    // Wait for initial poll to complete and record existing files
     runtime:sleep(3);
 
-    // Reset counters after initial poll
     textFileCounter = 0;
     capturedTextContent = ();
     capturedTextFileName = ();
 
-    // Now create the test file - it will be detected as "new"
     string testContent = "Hello, this is a text file content for testing!";
     error? putResult = smbClient->put("/content_tests/test_file.txt", testContent.toBytes());
     test:assertEquals(putResult, ());
 
-    // Wait for the listener to detect the new file
     runtime:sleep(5);
     check contentListener.immediateStop();
-
     test:assertTrue(textFileCounter >= 1, "onFileText should be triggered at least once");
     test:assertEquals(capturedTextContent, testContent, "Text content should match");
     test:assertEquals(capturedTextFileName, "test_file.txt", "File name should match");
@@ -518,16 +512,12 @@ function testOnFileCsvHandler() returns error? {
     check csvListener.attach(contentHandlerService);
     check csvListener.'start();
     runtime:registerListener(csvListener);
-
-    // Wait for initial poll to complete and record existing files
     runtime:sleep(3);
 
-    // Reset counters after initial poll
     csvFileCounter = 0;
     capturedCsvContent = ();
     capturedCsvFileName = ();
 
-    // Now create the test file - it will be detected as "new"
     string csvContent = "id,name,email\n1,John,john@example.com\n2,Jane,jane@example.com";
     error? putResult = smbClient->put("/content_tests/users.csv", csvContent.toBytes());
     test:assertEquals(putResult, ());
@@ -574,24 +564,18 @@ function testOnFileCsvRecordArrayHandler() returns error? {
     check csvRecordListener.'start();
     runtime:registerListener(csvRecordListener);
 
-    // Wait for initial poll to complete and record existing files
     runtime:sleep(3);
 
-    // Reset counters after initial poll
     csvRecordArrayCounter = 0;
     capturedCsvRecordArray = ();
     capturedCsvRecordArrayFileName = ();
-
-    // Now create the test file - it will be detected as "new"
     string csvContent = "id,name,email\n1,Alice,alice@example.com\n2,Bob,bob@example.com\n3,Charlie,charlie@example.com";
     error? putResult = smbClient->put("/content_tests/csv_record_array/record_users.csv", csvContent.toBytes());
     test:assertEquals(putResult, ());
 
-    // Wait for the listener to detect the new file
     runtime:sleep(5);
 
     check csvRecordListener.immediateStop();
-
     test:assertTrue(csvRecordArrayCounter >= 1, "onFileCsv with record[] should be triggered at least once");
     CsvRecord[]? recordData = capturedCsvRecordArray;
     if recordData is CsvRecord[] {
@@ -631,24 +615,19 @@ function testOnFileCsvStringStreamHandler() returns error? {
     check csvStreamListener.'start();
     runtime:registerListener(csvStreamListener);
 
-    // Wait for initial poll to complete and record existing files
     runtime:sleep(3);
 
-    // Reset counters after initial poll
     csvStringStreamCounter = 0;
     csvStringStreamRowCount = 0;
     capturedCsvStringStreamFileName = ();
 
-    // Now create the test file - it will be detected as "new"
     string csvContent = "id,name,email\n10,Dave,dave@example.com\n20,Eve,eve@example.com\n30,Frank,frank@example.com\n40,Grace,grace@example.com";
     error? putResult = smbClient->put("/content_tests/csv_string_stream/stream_users.csv", csvContent.toBytes());
     test:assertEquals(putResult, ());
 
-    // Wait for the listener to detect the new file
     runtime:sleep(5);
 
     check csvStreamListener.immediateStop();
-
     test:assertTrue(csvStringStreamCounter >= 1, "onFileCsv with stream<string[]> should be triggered at least once");
     test:assertTrue(csvStringStreamRowCount >= 4, "Stream should have processed at least 4 data rows");
     test:assertEquals(capturedCsvStringStreamFileName, "stream_users.csv", "File name should match");
@@ -682,24 +661,18 @@ function testOnFileCsvRecordStreamHandler() returns error? {
     check csvRecordStreamListener.'start();
     runtime:registerListener(csvRecordStreamListener);
 
-    // Wait for initial poll to complete and record existing files
     runtime:sleep(3);
 
-    // Reset counters after initial poll
     csvRecordStreamCounter = 0;
     csvRecordStreamRowCount = 0;
     capturedCsvRecordStreamFileName = ();
 
-    // Now create the test file - it will be detected as "new"
     string csvContent = "id,name,email\n100,Henry,henry@example.com\n200,Ivy,ivy@example.com\n300,Jack,jack@example.com";
     error? putResult = smbClient->put("/content_tests/csv_record_stream/record_stream_users.csv", csvContent.toBytes());
     test:assertEquals(putResult, ());
 
-    // Wait for the listener to detect the new file
     runtime:sleep(5);
-
     check csvRecordStreamListener.immediateStop();
-
     test:assertTrue(csvRecordStreamCounter >= 1, "onFileCsv with stream<record{}> should be triggered at least once");
     test:assertTrue(csvRecordStreamRowCount >= 2, "Stream should have processed at least 2 records");
     test:assertEquals(capturedCsvRecordStreamFileName, "record_stream_users.csv", "File name should match");
@@ -731,21 +704,15 @@ function testOnFileHandler() returns error? {
     check binaryListener.attach(contentHandlerService);
     check binaryListener.'start();
     runtime:registerListener(binaryListener);
-
-    // Wait for initial poll to complete and record existing files
     runtime:sleep(3);
 
-    // Reset counters after initial poll
     binaryFileCounter = 0;
     capturedBinaryContent = ();
     capturedBinaryFileName = ();
 
-    // Now create the test file - it will be detected as "new"
     byte[] binaryContent = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
     error? putResult = smbClient->put("/content_tests/image.png", binaryContent);
     test:assertEquals(putResult, ());
-
-    // Wait for the listener to detect the new file
     runtime:sleep(5);
 
     check binaryListener.immediateStop();
@@ -789,17 +756,11 @@ function testOnFileByteStreamHandler() returns error? {
     check byteStreamListener.attach(binaryStreamService);
     check byteStreamListener.'start();
     runtime:registerListener(byteStreamListener);
-
-    // Wait for initial poll to complete and record existing files
     runtime:sleep(3);
-
-    // Reset counters after initial poll
     binaryStreamCounter = 0;
     binaryStreamChunkCount = 0;
     binaryStreamTotalBytes = 0;
     capturedBinaryStreamFileName = ();
-
-    // Now create the test file - it will be detected as "new"
     byte[] largeContent = [];
     int i = 0;
     while i < 20000 {
@@ -808,12 +769,9 @@ function testOnFileByteStreamHandler() returns error? {
     }
     error? putResult = smbClient->put("/content_tests/byte_stream/large_binary.dat", largeContent);
     test:assertEquals(putResult, ());
-
-    // Wait for the listener to detect the new file
     runtime:sleep(5);
 
     check byteStreamListener.immediateStop();
-
     test:assertTrue(binaryStreamCounter >= 1, "onFile with stream<byte[]> should be triggered at least once");
     test:assertTrue(binaryStreamChunkCount == 1, "Stream should have processed at least 2 chunks");
     test:assertTrue(binaryStreamTotalBytes >= 20000, "Stream should have processed all bytes");

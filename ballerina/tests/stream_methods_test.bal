@@ -50,7 +50,7 @@ function testGetBytesAsStreamBasic() returns error? {
         do {
             result.push(...chunk);
         };
-    test:assertEquals(result, content, "Byte stream content mismatch");
+    test:assertEquals(result, content);
 }
 
 @test:Config {
@@ -72,8 +72,8 @@ function testGetBytesAsStreamLargeFile() returns error? {
             result.push(...chunk);
         };
 
-    test:assertEquals(result.length(), content.length(), "Large file stream length mismatch");
-    test:assertEquals(result, content, "Large file stream content mismatch");
+    test:assertEquals(result.length(), content.length());
+    test:assertEquals(result, content);
 }
 
 @test:Config {
@@ -364,7 +364,7 @@ function testBytesStreamVsNonStreamConsistency() returns error? {
             streamResult.push(...chunk);
         };
     if bytesResult is byte[] {
-        test:assertEquals(streamResult.length(), bytesResult.length(), "Stream and non-stream byte length should match");
-        test:assertEquals(streamResult, bytesResult, "Stream and non-stream byte content should match");
+        test:assertEquals(streamResult.length(), bytesResult.length());
+        test:assertEquals(streamResult, bytesResult);
     }
 }

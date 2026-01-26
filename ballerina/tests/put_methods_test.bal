@@ -341,8 +341,8 @@ function testPutXmlWithAttributes() returns error? {
     test:assertTrue(result is xml, "Failed to read XML with attributes");
     if result is xml {
         string resultStr = result.toString();
-        test:assertTrue(resultStr.includes("id="), "XML should contain id attribute");
-        test:assertTrue(resultStr.includes("Sample Book"), "XML should contain title");
+        test:assertTrue(resultStr.includes("id="));
+        test:assertTrue(resultStr.includes("Sample Book"));
     }
 }
 
@@ -357,9 +357,9 @@ function testPutXmlRecord() returns error? {
     string|Error result = testClient->getText(path);
     test:assertTrue(result is string, "Failed to read XML from record");
     if result is string {
-        test:assertTrue(result.includes("<name>Bob</name>"), "XML should contain name element");
-        test:assertTrue(result.includes("<age>35</age>"), "XML should contain age element");
-        test:assertTrue(result.includes("<city>Chicago</city>"), "XML should contain city element");
+        test:assertTrue(result.includes("<name>Bob</name>"));
+        test:assertTrue(result.includes("<age>35</age>"));
+        test:assertTrue(result.includes("<city>Chicago</city>"));
     }
 }
 
@@ -378,7 +378,7 @@ function testPutCsvStringArrays() returns error? {
     string[][]|Error result = testClient->getCsv(path);
     test:assertTrue(result is string[][], "Failed to read CSV");
     if result is string[][] {
-        test:assertEquals(result, content, "CSV content mismatch");
+        test:assertEquals(result, content);
     }
 }
 
@@ -404,10 +404,10 @@ function testPutCsvAppend() returns error? {
     string|Error result = testClient->getText(path);
     test:assertTrue(result is string, "Failed to read appended CSV");
     if result is string {
-        test:assertTrue(result.includes("id,name,score"), "CSV should contain headers");
-        test:assertTrue(result.includes("Alice"), "CSV should contain Alice");
-        test:assertTrue(result.includes("Bob"), "CSV should contain Bob");
-        test:assertTrue(result.includes("Charlie"), "CSV should contain Charlie");
+        test:assertTrue(result.includes("id,name,score"));
+        test:assertTrue(result.includes("Alice"));
+        test:assertTrue(result.includes("Bob"));
+        test:assertTrue(result.includes("Charlie"));
     }
 }
 
@@ -427,8 +427,8 @@ function testPutCsvWithSpecialCharacters() returns error? {
     string|Error result = testClient->getText(path);
     test:assertTrue(result is string, "Failed to read CSV with special chars");
     if result is string {
-        test:assertTrue(result.includes("\"Contains, comma\""), "Comma values should be quoted");
-        test:assertTrue(result.includes("\"\""), "Quotes should be escaped");
+        test:assertTrue(result.includes("\"Contains, comma\""));
+        test:assertTrue(result.includes("\"\""));
     }
 }
 
@@ -448,8 +448,8 @@ function testPutCsvEmptyValues() returns error? {
     string|Error result = testClient->getText(path);
     test:assertTrue(result is string, "Failed to read CSV with empty values");
     if result is string {
-        test:assertTrue(result.includes("value1,,value3"), "Should handle empty middle value");
-        test:assertTrue(result.includes(",value2,"), "Should handle empty start and end values");
+        test:assertTrue(result.includes("value1,,value3"));
+        test:assertTrue(result.includes(",value2,"));
     }
 }
 
@@ -480,8 +480,8 @@ function testPutCsvRecordsAppendNoHeader() returns error? {
             index = found + 1;
         }
         test:assertTrue(nameCount <= 2, "Header 'name' should appear only once or twice (once in header)");
-        test:assertTrue(result.includes("Alice"), "CSV should contain Alice");
-        test:assertTrue(result.includes("Bob"), "CSV should contain Bob");
+        test:assertTrue(result.includes("Alice"));
+        test:assertTrue(result.includes("Bob"));
     }
 }
 
@@ -502,7 +502,7 @@ function testPutTextThenOverwrite() returns error? {
     string|Error result2 = testClient->getText(path);
     test:assertTrue(result2 is string, "Failed to read overwritten text");
     if result2 is string {
-        test:assertEquals(result2, "New content", "Overwritten content should replace old content");
+        test:assertEquals(result2, "New content");
     }
 }
 
@@ -518,6 +518,6 @@ function testPutDifferentFormatsToSameFile() returns error? {
     string|Error result = testClient->getText(path);
     test:assertTrue(result is string, "Failed to read content");
     if result is string {
-        test:assertTrue(result.includes("JSON content"), "Should contain JSON content");
+        test:assertTrue(result.includes("JSON content"));
     }
 }
