@@ -131,6 +131,8 @@ public class SmbClient {
     private static final String ON_CLOSE_ERROR = "Error occurred while closing the SMB client: ";
     public static final String MISSING_CREDENTIALS_FOR_AUTH_ERROR =
             "Credentials must be provided for the specified auth configuration";
+    public static final String MISSING_CREDENTIALS_FOR_KERBEROS_ERROR =
+            "Credentials with password must be provided for Kerberos authentication when keytab is not specified";
     public static final String DIALECT_NOT_SPECIFIED_ERROR = "At least one dialect must be specified";
 
     private static final Set<String> EXECUTABLE_EXTENSIONS = Set.of(
@@ -177,19 +179,28 @@ public class SmbClient {
             String authType = AUTH_TYPE_ANONYMOUS;
             if (authConfig != null) {
                 BMap<?, ?> credentials = authConfig.getMapValue(StringUtils.fromString(ENDPOINT_CONFIG_CREDENTIALS));
-                if (credentials == null) {
+                BMap<?, ?> kerberosConfig = authConfig.getMapValue(StringUtils.fromString(KERBEROS_CONFIG));
+                if (credentials == null && kerberosConfig == null) {
                     return SmbUtil.createError(MISSING_CREDENTIALS_FOR_AUTH_ERROR, SMB_ERROR);
                 }
-                String username =
-                        credentials.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_USERNAME)).getValue();
-                String password =
-                        credentials.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_PASS_KEY)).getValue();
-                String domain =
-                        credentials.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_DOMAIN)).getValue();
-                clientEndpoint.addNativeData(ENDPOINT_CONFIG_USERNAME, username);
-                clientEndpoint.addNativeData(ENDPOINT_CONFIG_PASS_KEY, password);
-                clientEndpoint.addNativeData(ENDPOINT_CONFIG_DOMAIN, domain);
-                BMap<?, ?> kerberosConfig = authConfig.getMapValue(StringUtils.fromString(KERBEROS_CONFIG));
+                if (kerberosConfig != null && credentials == null) {
+                    BString keytabValue = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_KEYTAB));
+                    boolean hasKeytab = keytabValue != null && !keytabValue.getValue().isEmpty();
+                    if (!hasKeytab) {
+                        return SmbUtil.createError(MISSING_CREDENTIALS_FOR_KERBEROS_ERROR, SMB_ERROR);
+                    }
+                }
+                if (credentials != null) {
+                    String username =
+                            credentials.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_USERNAME)).getValue();
+                    String password =
+                            credentials.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_PASS_KEY)).getValue();
+                    String domain =
+                            credentials.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_DOMAIN)).getValue();
+                    clientEndpoint.addNativeData(ENDPOINT_CONFIG_USERNAME, username);
+                    clientEndpoint.addNativeData(ENDPOINT_CONFIG_PASS_KEY, password);
+                    clientEndpoint.addNativeData(ENDPOINT_CONFIG_DOMAIN, domain);
+                }
                 clientEndpoint.addNativeData(KERBEROS_CONFIG, kerberosConfig);
                 authType = kerberosConfig != null ? AUTH_TYPE_KERBEROS : AUTH_TYPE_NTLM;
             }
@@ -616,13 +627,17 @@ public class SmbClient {
         AuthenticationContext authContext;
         if (authType.equals(AUTH_TYPE_ANONYMOUS)) {
             authContext = AuthenticationContext.anonymous();
+        } else if (authType.equals(AUTH_TYPE_KERBEROS)) {
+            Object passwordObj = clientEndpoint.getNativeData(ENDPOINT_CONFIG_PASS_KEY);
+            Object domainObj = clientEndpoint.getNativeData(ENDPOINT_CONFIG_DOMAIN);
+            String password = passwordObj != null ? passwordObj.toString() : null;
+            String domain = domainObj != null ? domainObj.toString() : null;
+            authContext = createKerberosAuthContext(clientEndpoint, password, domain);
         } else {
             String username = clientEndpoint.getNativeData(ENDPOINT_CONFIG_USERNAME).toString();
             String password = clientEndpoint.getNativeData(ENDPOINT_CONFIG_PASS_KEY).toString();
             String domain = clientEndpoint.getNativeData(ENDPOINT_CONFIG_DOMAIN).toString();
-            authContext = authType.equals(AUTH_TYPE_KERBEROS)
-                    ? createKerberosAuthContext(clientEndpoint, password, domain)
-                    : new AuthenticationContext(username, password.toCharArray(), domain);
+            authContext = new AuthenticationContext(username, password.toCharArray(), domain);
         }
         return connection.authenticate(authContext);
     }

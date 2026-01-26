@@ -45,7 +45,7 @@ public type KerberosConfig record {|
 # + credentials - Username, password, and optional domain for authentication
 # + kerberosConfig - Additional configurations for Kerberos authentication
 public type AuthConfiguration record {|
-    Credentials credentials;
+    Credentials credentials?;
     KerberosConfig kerberosConfig?;
 |};
 

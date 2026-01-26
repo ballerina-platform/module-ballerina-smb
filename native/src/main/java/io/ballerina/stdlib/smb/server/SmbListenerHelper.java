@@ -94,6 +94,7 @@ import static io.ballerina.stdlib.smb.client.SmbClient.IS_DIRECTORY;
 import static io.ballerina.stdlib.smb.client.SmbClient.IS_EXECUTABLE;
 import static io.ballerina.stdlib.smb.client.SmbClient.IS_HIDDEN;
 import static io.ballerina.stdlib.smb.client.SmbClient.IS_WRITABLE;
+import static io.ballerina.stdlib.smb.client.SmbClient.MISSING_CREDENTIALS_FOR_AUTH_ERROR;
 import static io.ballerina.stdlib.smb.client.SmbClient.MODIFIED_AT;
 import static io.ballerina.stdlib.smb.client.SmbClient.NAME;
 import static io.ballerina.stdlib.smb.client.SmbClient.PATH;
@@ -124,6 +125,8 @@ public class SmbListenerHelper {
     public static final String KERBEROS_KEYTAB = "keytab";
     public static final String KERBEROS_CONFIG_FILE = "configFile";
     public static final String KERBEROS_AUTH_CONTEXT_ERROR = "Failed to create Kerberos authentication context: ";
+    public static final String MISSING_CREDENTIALS_FOR_KERBEROS_ERROR =
+            "Credentials with password must be provided for Kerberos authentication when keytab is not specified";
     private static final String LISTENER_SERVICES = "LISTENER_SERVICES";
     private static final String LISTENER_PREVIOUS_FILES = "LISTENER_PREVIOUS_FILES";
     private static final String LISTENER_SMB_CLIENT = "LISTENER_SMB_CLIENT";
@@ -287,7 +290,7 @@ public class SmbListenerHelper {
     }
 
     private static void checkForFileChanges(Environment env, BObject listenerEndpoint,
-                                            BMap<BString, Object> config) throws IOException {
+                                            BMap<BString, Object> config) throws Exception {
         DiskShare diskShare = getOrCreateDiskShare(listenerEndpoint, config);
         List<SmbService> services =
                 (List<SmbService>) listenerEndpoint.getNativeData(LISTENER_SERVICES);
@@ -305,7 +308,7 @@ public class SmbListenerHelper {
     }
 
     private static DiskShare getOrCreateDiskShare(BObject listenerEndpoint,
-                                                   BMap<BString, Object> config) throws IOException {
+                                                   BMap<BString, Object> config) throws Exception {
         DiskShare existingShare = (DiskShare) listenerEndpoint.getNativeData(LISTENER_DISK_SHARE);
         Connection existingConnection = (Connection) listenerEndpoint.getNativeData(LISTENER_CONNECTION);
         if (existingShare != null && existingConnection != null && existingConnection.isConnected()) {
@@ -328,13 +331,37 @@ public class SmbListenerHelper {
         return diskShare;
     }
 
-    private static AuthenticationContext createAuthContext(BMap<?, ?> authConfig) {
+    private static AuthenticationContext createAuthContext(BMap<?, ?> authConfig) throws Exception {
         if (authConfig == null) {
             return AuthenticationContext.anonymous();
         }
         BMap<?, ?> credentials = authConfig.getMapValue(StringUtils.fromString(ENDPOINT_CONFIG_CREDENTIALS));
-        if (credentials == null) {
-            return AuthenticationContext.anonymous();
+        BMap<?, ?> kerberosConfig = authConfig.getMapValue(StringUtils.fromString(KERBEROS_CONFIG));
+        if (credentials == null && kerberosConfig == null) {
+            throw SmbUtil.createError(MISSING_CREDENTIALS_FOR_AUTH_ERROR, SMB_ERROR);
+        }
+        if (kerberosConfig != null && credentials == null) {
+            BString keytabValue = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_KEYTAB));
+            boolean hasKeytab = keytabValue != null && !keytabValue.getValue().isEmpty();
+            if (!hasKeytab) {
+                throw SmbUtil.createError(MISSING_CREDENTIALS_FOR_KERBEROS_ERROR, SMB_ERROR);
+            }
+        }
+        if (kerberosConfig != null) {
+            BString keytabValue = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_KEYTAB));
+            boolean hasKeytab = keytabValue != null && !keytabValue.getValue().isEmpty();
+            if (!hasKeytab && credentials == null) {
+                throw new RuntimeException(MISSING_CREDENTIALS_FOR_KERBEROS_ERROR);
+            }
+            String password = null;
+            String domain = null;
+            if (credentials != null) {
+                BString passwordBStr = credentials.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_PASS_KEY));
+                password = passwordBStr != null ? passwordBStr.getValue() : null;
+                BString domainBStr = credentials.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_DOMAIN));
+                domain = domainBStr != null ? domainBStr.getValue() : null;
+            }
+            return createKerberosAuthContext(kerberosConfig, password, domain);
         }
         String username =
                 credentials.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_USERNAME)).getValue();
@@ -342,10 +369,6 @@ public class SmbListenerHelper {
                 credentials.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_PASS_KEY)).getValue();
         BString domainBStr = credentials.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_DOMAIN));
         String domain = domainBStr != null ? domainBStr.getValue() : null;
-        BMap<?, ?> kerberosConfig = authConfig.getMapValue(StringUtils.fromString(KERBEROS_CONFIG));
-        if (kerberosConfig != null) {
-            return createKerberosAuthContext(kerberosConfig, password, domain);
-        }
         return new AuthenticationContext(
                 username,
                 password != null ? password.toCharArray() : new char[0],
