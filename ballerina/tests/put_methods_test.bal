@@ -297,6 +297,48 @@ function testPutJsonRecord() returns error? {
 }
 
 @test:Config {
+    groups: ["put", "getJson", "getJsonAsRecord"],
+    dependsOn: [testPutJsonRecord]
+}
+function testGetJsonAsRecord() returns error? {
+    string path = "/test/get-json-as-record.json";
+    json content = {name: "John Doe", age: 35, city: "San Francisco"};
+    check testClient->putJson(path, content, OVERWRITE);
+    Person|Error result = testClient->getJson(path);
+    test:assertTrue(result is Person, "Failed to read JSON as record type");
+    if result is Person {
+        test:assertEquals(result.name, "John Doe", "Name mismatch");
+        test:assertEquals(result.age, 35, "Age mismatch");
+        test:assertEquals(result.city, "San Francisco", "City mismatch");
+    }
+}
+
+@test:Config {
+    groups: ["put", "getJson", "getJsonAsRecord"],
+    dependsOn: [testGetJsonAsRecord]
+}
+function testGetJsonAsNestedRecord() returns error? {
+    string path = "/test/get-json-as-nested-record.json";
+    json content = {
+        name: "Jane Smith",
+        department: "Marketing",
+        address: {
+            city: "Austin",
+            zip: "78701"
+        }
+    };
+    check testClient->putJson(path, content, OVERWRITE);
+    EmployeeRecord|Error result = testClient->getJson(path);
+    test:assertTrue(result is EmployeeRecord, "Failed to read JSON as nested record type");
+    if result is EmployeeRecord {
+        test:assertEquals(result.name, "Jane Smith", "Name mismatch");
+        test:assertEquals(result.department, "Marketing", "Department mismatch");
+        test:assertEquals(result.address.city, "Austin", "City mismatch");
+        test:assertEquals(result.address.zip, "78701", "Zip mismatch");
+    }
+}
+
+@test:Config {
     groups: ["put", "putXml"]
 }
 function testPutXmlSimple() returns error? {

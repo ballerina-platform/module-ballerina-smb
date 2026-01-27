@@ -32,6 +32,7 @@ string? capturedTextFileName = ();
 
 int jsonFileCounter = 0;
 json? capturedJsonContent = ();
+Person? capturedJsonType = ();
 string? capturedJsonFileName = ();
 
 int xmlFileCounter = 0;
@@ -273,6 +274,14 @@ type XmlConfigWithAnnotation record {|
     int timeout;
 |};
 
+Service jsonHandlerService = service object {
+    remote function onFileJson(Person content, FileInfo fileInfo) returns error? {
+        jsonFileCounter += 1;
+        capturedJsonType = content;
+        capturedJsonFileName = fileInfo.name;
+    }
+};
+
 Service contentHandlerService = service object {
     remote function onFileText(string content, FileInfo fileInfo) returns error? {
         textFileCounter += 1;
@@ -443,7 +452,7 @@ function testOnFileTextHandler() returns error? {
 }
 function testOnFileJsonHandler() returns error? {
     jsonFileCounter = 0;
-    capturedJsonContent = ();
+    capturedJsonType = ();
     capturedJsonFileName = ();
 
     Listener jsonListener = check new ({
@@ -460,16 +469,16 @@ function testOnFileJsonHandler() returns error? {
         bufferSize: 65536
     });
 
-    check jsonListener.attach(contentHandlerService);
+    check jsonListener.attach(jsonHandlerService);
     check jsonListener.'start();
     runtime:registerListener(jsonListener);
 
-    json testJson = {
-        "name": "John Doe",
-        "age": 30,
-        "email": "john@example.com"
+    Person person = {
+        name: "John Doe",
+        age: 30 ,
+        city: "New York"
     };
-    error? putResult = smbClient->putBytes("/content_tests/user_data.json", testJson.toString().toBytes());
+    error? putResult = smbClient->putJson("/content_tests/user_data.json", person);
     test:assertEquals(putResult, ());
     runtime:sleep(5);
     check jsonListener.immediateStop();
