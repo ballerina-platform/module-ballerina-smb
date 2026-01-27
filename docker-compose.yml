@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  smb-server:
+    image: dperson/samba
+    container_name: smb-test-server
+    environment:
+      - USER=testuser;testpass
+      - SHARE=testshare;/share;yes;no;no;testuser;testuser;testuser
+      - PERMISSIONS=yes
+    ports:
+      - "445:445"
+      - "139:139"
+    volumes:
+      - smb-data:/share
+      - smb-public:/public
+    command: '-s "testshare;/share;yes;no;no;testuser" -s "publicshare;/public;yes;no;yes" -u "testuser;testpass" -p'
+    healthcheck:
+      test: ["CMD", "smbclient", "-L", "localhost", "-U", "testuser%testpass", "-m", "SMB3"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smb-network
+
+volumes:
+  smb-data:
+  smb-public:
+
+networks:
+  smb-network:
+    driver: bridge

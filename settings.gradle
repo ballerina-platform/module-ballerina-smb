@@ -18,8 +18,12 @@
 
 pluginManagement {
     plugins {
+        id "com.github.spotbugs" version "${spotbugsPluginVersion}"
+        id "com.github.johnrengelman.shadow" version "${shadowJarPluginVersion}"
+        id "de.undercouch.download" version "${downloadPluginVersion}"
         id "net.researchgate.release" version "${releasePluginVersion}"
         id "io.ballerina.plugin" version "${ballerinaGradlePluginVersion}"
+        id "com.github.psxpaul.execfork"  version "${execForkPluginVersion}"
     }
 
     repositories {
@@ -35,14 +39,18 @@ pluginManagement {
 }
 
 plugins {
-    id "com.gradle.enterprise" version "3.2"
+    id "com.gradle.enterprise" version "3.13.2"
 }
 
-rootProject.name = 'module-ballerina-smb'
+rootProject.name = 'smb'
 
+include ':checkstyle'
+include ':smb-native'
 include ':smb-ballerina'
 
-project(':smb-ballerina').projectDir = file("ballerina")
+project(':checkstyle').projectDir = file("build-config${File.separator}checkstyle")
+project(':smb-native').projectDir = file('native')
+project(':smb-ballerina').projectDir = file('ballerina')
 
 gradleEnterprise {
     buildScan {

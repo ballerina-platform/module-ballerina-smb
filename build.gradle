@@ -17,13 +17,17 @@
  */
 
 plugins {
-    id 'net.researchgate.release'
+    id "com.github.spotbugs"
+    id "com.github.johnrengelman.shadow"
+    id "de.undercouch.download"
+    id "net.researchgate.release"
 }
 
 allprojects {
     group = project.group
     version = project.version
 
+    apply plugin: 'jacoco'
     apply plugin: 'maven-publish'
 
     repositories {
@@ -50,24 +54,58 @@ allprojects {
     }
 
     ext {
-        snapshotVersion = '-SNAPSHOT'
+        snapshotVersion= '-SNAPSHOT'
         timestampedVersionRegex = '.*-\\d{8}-\\d{6}-\\w.*\$'
+    }
+}
+
+subprojects {
+
+    configurations {
+        ballerinaStdLibs
+        jbalTools
+    }
+
+    dependencies {
+        /* JBallerina Tools */
+        jbalTools ("org.ballerinalang:jballerina-tools:${ballerinaLangVersion}") {
+            transitive = false
+        }
+
+        /* Standard libraries */
+        ballerinaStdLibs "io.ballerina.stdlib:uuid-ballerina:${stdlibUuidVersion}"
+        ballerinaStdLibs "io.ballerina.stdlib:log-ballerina:${stdlibLogVersion}"
+        ballerinaStdLibs "io.ballerina.stdlib:os-ballerina:${stdlibOsVersion}"
+        ballerinaStdLibs "io.ballerina.stdlib:io-ballerina:${stdlibIoVersion}"
+        ballerinaStdLibs "io.ballerina.stdlib:crypto-ballerina:${stdlibCryptoVersion}"
+        ballerinaStdLibs "io.ballerina.stdlib:task-ballerina:${stdlibTaskVersion}"
+        ballerinaStdLibs "io.ballerina.stdlib:uuid-ballerina:${stdlibUuidVersion}"
+        ballerinaStdLibs "io.ballerina.stdlib:time-ballerina:${stdlibTimeVersion}"
+        ballerinaStdLibs "io.ballerina.stdlib:file-ballerina:${stdlibFileVersion}"
+        ballerinaStdLibs "io.ballerina.stdlib:observe-ballerina:${observeVersion}"
+        ballerinaStdLibs "io.ballerina:observe-ballerina:${observeInternalVersion}"
+
+        ballerinaStdLibs "io.ballerina.lib:data.jsondata-ballerina:${stdlibDataJsonDataVersion}"
+        ballerinaStdLibs "io.ballerina.lib:data.xmldata-ballerina:${stdlibDataXmlDataVersion}"
+        ballerinaStdLibs "io.ballerina.lib:data.csv-ballerina:${stdlibDataCsvVersion}"
     }
 }
 
 def moduleVersion = project.version.replace("-SNAPSHOT", "")
 
-task build {
-    dependsOn(':smb-ballerina:build')
-}
-
 release {
+
     buildTasks = ['build']
     failOnSnapshotDependencies = true
     versionPropertyFile = 'gradle.properties'
     tagTemplate = 'v${version}'
+
     git {
         requireBranch = "release-${moduleVersion}"
         pushToRemote = 'origin'
     }
+}
+
+task build {
+    dependsOn('smb-ballerina:build')
 }
