@@ -15,7 +15,7 @@
 // under the License.
 
 # SMB caller for interacting with SMB servers from within file handlers.
-# Provides the same file operations as the Client class.
+# Provides a convenience wrapper around the Client class with simplified method signatures.
 public isolated client class Caller {
     private final Client 'client;
 
