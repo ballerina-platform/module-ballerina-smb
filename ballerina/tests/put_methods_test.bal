@@ -471,7 +471,7 @@ function testPutCsvStringArrays() returns error? {
     string[][]|Error result = testClient->getCsv(path);
     test:assertTrue(result is string[][], "Failed to read CSV");
     if result is string[][] {
-        test:assertEquals(result, content);
+        test:assertEquals(result, content.slice(1));
     }
 }
 

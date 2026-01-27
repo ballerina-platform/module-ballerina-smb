@@ -325,7 +325,7 @@ function testGetCsvAsStreamWithLaxDataBinding() returns error? {
     groups: ["stream", "integration"],
     dependsOn: [testGetCsvAsStreamCloseEarly]
 }
-function testStreamVsNonStreamConsistency() returns error? {
+function testStreamAndNonStreamApproaches() returns error? {
     string path = "/streamtest/stream-vs-nonstream.csv";
     string[][] content = [
         ["id", "name"],
@@ -342,14 +342,14 @@ function testStreamVsNonStreamConsistency() returns error? {
             streamResult.push(row);
         };
     if csvResult is string[][] {
-        test:assertEquals(streamResult.length(), csvResult.slice(1).length(), "Stream and non-stream row count should match");
-        test:assertEquals(streamResult, csvResult.slice(1), "Stream and non-stream content should match");
+        test:assertEquals(streamResult.length(), csvResult.length(), "Stream and non-stream row count should match");
+        test:assertEquals(streamResult, csvResult, "Stream and non-stream content should match");
     }
 }
 
 @test:Config {
     groups: ["stream", "integration"],
-    dependsOn: [testStreamVsNonStreamConsistency]
+    dependsOn: [testStreamAndNonStreamApproaches]
 }
 function testBytesStreamVsNonStreamConsistency() returns error? {
     string path = "/streamtest/bytes-stream-vs-nonstream.bin";

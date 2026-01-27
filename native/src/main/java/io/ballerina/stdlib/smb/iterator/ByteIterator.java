@@ -51,10 +51,14 @@ public class ByteIterator {
     }
 
     public static Object createByteStream(byte[] content) {
+        InputStream inputStream = new ByteArrayInputStream(content);
+        return createByteStream(inputStream);
+    }
+
+    public static Object createByteStream(InputStream inputStream) {
         BObject contentByteStreamObject = ValueCreator.createObjectValue(
                 ModuleUtils.getModule(), "ContentByteStream", null, null
         );
-        InputStream inputStream = new ByteArrayInputStream(content);
         contentByteStreamObject.addNativeData(NATIVE_INPUT_STREAM, inputStream);
         StreamType streamType = TypeCreator.createStreamType(TypeCreator.createArrayType(PredefinedTypes.TYPE_BYTE),
                 TypeCreator.createUnionType(PredefinedTypes.TYPE_ERROR, PredefinedTypes.TYPE_NULL)

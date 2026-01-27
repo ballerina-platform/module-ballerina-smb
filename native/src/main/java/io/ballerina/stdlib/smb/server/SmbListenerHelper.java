@@ -338,13 +338,13 @@ public class SmbListenerHelper {
         BMap<?, ?> credentials = authConfig.getMapValue(StringUtils.fromString(ENDPOINT_CONFIG_CREDENTIALS));
         BMap<?, ?> kerberosConfig = authConfig.getMapValue(StringUtils.fromString(KERBEROS_CONFIG));
         if (credentials == null && kerberosConfig == null) {
-            throw SmbUtil.createError(MISSING_CREDENTIALS_FOR_AUTH_ERROR, SMB_ERROR);
+            throw new Exception(MISSING_CREDENTIALS_FOR_AUTH_ERROR);
         }
         if (kerberosConfig != null && credentials == null) {
             BString keytabValue = kerberosConfig.getStringValue(StringUtils.fromString(KERBEROS_KEYTAB));
             boolean hasKeytab = keytabValue != null && !keytabValue.getValue().isEmpty();
             if (!hasKeytab) {
-                throw SmbUtil.createError(MISSING_CREDENTIALS_FOR_KERBEROS_ERROR, SMB_ERROR);
+                throw new Exception(MISSING_CREDENTIALS_FOR_KERBEROS_ERROR);
             }
         }
         if (kerberosConfig != null) {
@@ -639,28 +639,53 @@ public class SmbListenerHelper {
             String normalizedPath = filePath.startsWith(SLASH_SUFFIX) ? filePath.substring(1) : filePath;
             Set<AccessMask> accessMask = new HashSet<>();
             accessMask.add(AccessMask.GENERIC_READ);
-            try (File file = diskShare.openFile(normalizedPath, accessMask, null,
-                    SMB2ShareAccess.ALL, SMB2CreateDisposition.FILE_OPEN, null);
-                 InputStream inputStream = file.getInputStream()) {
-                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                byte[] buffer = new byte[ARRAY_SIZE];
-                int bytesRead;
-                while ((bytesRead = inputStream.read(buffer)) != -1) {
-                    outputStream.write(buffer, 0, bytesRead);
-                }
-                byte[] bytes = outputStream.toByteArray();
 
+            Type referredType = TypeUtils.getReferredType(contentParamType);
+            boolean isStreamType = referredType.getTag() == TypeTags.STREAM_TAG;
+
+            if (isStreamType) {
+                File file = diskShare.openFile(normalizedPath, accessMask, null,
+                        SMB2ShareAccess.ALL, SMB2CreateDisposition.FILE_OPEN, null);
+                InputStream inputStream = file.getInputStream();
                 return switch (methodName) {
-                    case ON_FILE_TEXT -> StringUtils.fromString(new String(bytes, StandardCharsets.UTF_8));
-                    case ON_FILE_JSON -> parseJsonContent(bytes, contentParamType);
-                    case ON_FILE_XML -> parseXmlContent(bytes, contentParamType);
-                    case ON_FILE_CSV -> parseCsvContent(env, bytes, contentParamType);
-                    case ON_FILE -> parseByteContent(bytes, contentParamType);
-                    default -> ValueCreator.createArrayValue(bytes);
+                    case ON_FILE_CSV -> parseCsvContentAsStream(inputStream, contentParamType);
+                    case ON_FILE -> parseByteContentAsStream(inputStream);
+                    default -> {
+                        inputStream.close();
+                        file.close();
+                        yield readFileContentAsBytes(env, diskShare, normalizedPath, methodName, contentParamType);
+                    }
                 };
             }
+            return readFileContentAsBytes(env, diskShare, normalizedPath, methodName, contentParamType);
         } catch (IOException e) {
             return SmbUtil.createError(FILE_READ_ERROR + e.getMessage(), SMB_ERROR);
+        }
+    }
+
+    private static Object readFileContentAsBytes(Environment env, DiskShare diskShare, String normalizedPath,
+                                                  String methodName, Type contentParamType) throws IOException {
+        Set<AccessMask> accessMask = new HashSet<>();
+        accessMask.add(AccessMask.GENERIC_READ);
+        try (File file = diskShare.openFile(normalizedPath, accessMask, null,
+                SMB2ShareAccess.ALL, SMB2CreateDisposition.FILE_OPEN, null);
+             InputStream inputStream = file.getInputStream()) {
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            byte[] buffer = new byte[ARRAY_SIZE];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+            }
+            byte[] bytes = outputStream.toByteArray();
+
+            return switch (methodName) {
+                case ON_FILE_TEXT -> StringUtils.fromString(new String(bytes, StandardCharsets.UTF_8));
+                case ON_FILE_JSON -> parseJsonContent(bytes, contentParamType);
+                case ON_FILE_XML -> parseXmlContent(bytes, contentParamType);
+                case ON_FILE_CSV -> parseCsvContent(env, bytes, contentParamType);
+                case ON_FILE -> parseByteContent(bytes, contentParamType);
+                default -> ValueCreator.createArrayValue(bytes);
+            };
         }
     }
 
@@ -794,6 +819,24 @@ public class SmbListenerHelper {
             return ByteIterator.createByteStream(bytes);
         }
         return ValueCreator.createArrayValue(bytes);
+    }
+
+    private static Object parseByteContentAsStream(InputStream inputStream) {
+        return ByteIterator.createByteStream(inputStream);
+    }
+
+    private static Object parseCsvContentAsStream(InputStream inputStream, Type targetType) {
+        Type referredType = TypeUtils.getReferredType(targetType);
+        StreamType streamType = (StreamType) referredType;
+        Type constraintType = streamType.getConstrainedType();
+        Type referredConstraintType = TypeUtils.getReferredType(constraintType);
+        if (referredConstraintType.getTag() == TypeTags.ARRAY_TAG) {
+            ArrayType arrayType = (ArrayType) referredConstraintType;
+            if (arrayType.getElementType().getTag() == TypeTags.STRING_TAG) {
+                return CsvIterator.createStringArrayStream(inputStream, constraintType, false);
+            }
+        }
+        return CsvIterator.createRecordStream(inputStream, constraintType, false);
     }
 
     private static void notifyServiceOnError(Environment env, BObject service, Exception e) {
