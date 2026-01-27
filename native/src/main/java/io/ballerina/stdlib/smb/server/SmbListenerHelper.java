@@ -33,6 +33,7 @@ import com.hierynomus.smbj.share.DiskShare;
 import com.hierynomus.smbj.share.File;
 import io.ballerina.lib.data.csvdata.csv.Native;
 import io.ballerina.runtime.api.Environment;
+import io.ballerina.runtime.api.Module;
 import io.ballerina.runtime.api.concurrent.StrandMetadata;
 import io.ballerina.runtime.api.creators.ErrorCreator;
 import io.ballerina.runtime.api.creators.TypeCreator;
@@ -674,10 +675,29 @@ public class SmbListenerHelper {
 
     private static Object parseXmlContent(byte[] bytes, Type targetType) {
         try {
-            return XmlUtils.parse(StringUtils.fromString(new String(bytes, StandardCharsets.UTF_8)));
+            Type referredType = TypeUtils.getReferredType(targetType);
+            if (referredType.getQualifiedName().equals("xml")) {
+                return XmlUtils.parse(StringUtils.fromString(new String(bytes, StandardCharsets.UTF_8)));
+            }
+            BMap<BString, Object> options = createXmlParseOptions();
+            Object result = io.ballerina.lib.data.xmldata.xml.Native.parseBytes(
+                    ValueCreator.createArrayValue(bytes), options, ValueCreator.createTypedescValue(referredType));
+            if (result instanceof BError) {
+                return SmbUtil.createError(((BError) result).getErrorMessage().getValue(), SMB_ERROR);
+            }
+            return result;
+        } catch (BError e) {
+            return SmbUtil.createError(e.getErrorMessage().getValue(), SMB_ERROR);
         } catch (Exception e) {
             return SmbUtil.createError(PARSE_XML_CONTENT_ERROR + e.getMessage(), SMB_ERROR);
         }
+    }
+
+    private static BMap<BString, Object> createXmlParseOptions() {
+        BMap<BString, Object> mapValue = ValueCreator.createRecordValue(
+                new Module("ballerina", "data.xmldata", "1"), "SourceOptions");
+        mapValue.put(StringUtils.fromString("allowDataProjection"), true);
+        return mapValue;
     }
 
     private static Object parseCsvContent(Environment env, byte[] bytes, Type targetType) {

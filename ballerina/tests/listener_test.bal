@@ -14,9 +14,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
+import ballerina/data.xmldata;
 import ballerina/io;
-import ballerina/test;
 import ballerina/lang.runtime;
+import ballerina/test;
 
 int createCounter = 0;
 int deleteCounter = 0;
@@ -255,6 +256,23 @@ int binaryStreamChunkCount = 0;
 int binaryStreamTotalBytes = 0;
 string? capturedBinaryStreamFileName = ();
 
+int xmlRecordCounter = 0;
+XmlConfig? capturedXmlRecordContent = ();
+string? capturedXmlRecordFileName = ();
+
+type XmlConfig record {|
+    string database;
+    int timeout;
+|};
+
+@xmldata:Name {
+    value: "config"
+}
+type XmlConfigWithAnnotation record {|
+    string database;
+    int timeout;
+|};
+
 Service contentHandlerService = service object {
     remote function onFileText(string content, FileInfo fileInfo) returns error? {
         textFileCounter += 1;
@@ -361,6 +379,18 @@ Service binaryStreamService = service object {
 
     function onError(error err) returns error? {
         io:println("Binary stream handler error: ", err.message());
+    }
+};
+
+Service xmlRecordService = service object {
+    remote function onFileXml(XmlConfigWithAnnotation content, FileInfo fileInfo) returns error? {
+        xmlRecordCounter += 1;
+        capturedXmlRecordContent = content;
+        capturedXmlRecordFileName = fileInfo.name;
+    }
+
+    function onError(error err) returns error? {
+        io:println("XML record handler error: ", err.message());
     }
 };
 
@@ -777,4 +807,59 @@ function testOnFileByteStreamHandler() returns error? {
     test:assertTrue(binaryStreamTotalBytes >= 20000, "Stream should have processed all bytes");
     test:assertEquals(capturedBinaryStreamFileName, "large_binary.dat", "File name should match");
     error? result = smbClient->rmdir("content_tests");
+}
+
+@test:Config {
+    groups: ["listener", "content-handlers", "xml-record"],
+    dependsOn: [testOnFileByteStreamHandler]
+}
+function testOnFileXmlRecordHandler() returns error? {
+    xmlRecordCounter = 0;
+    capturedXmlRecordContent = ();
+    capturedXmlRecordFileName = ();
+
+    check smbClient->mkdir("xml_record_tests");
+
+    Listener xmlRecordListener = check new ({
+        host: "localhost",
+        port: 445,
+        auth: {
+            credentials: {
+                username: "testuser",
+                password: "testpass"
+            }
+        },
+        share: "testshare",
+        pollingInterval: 2,
+        bufferSize: 65536
+    });
+
+    check xmlRecordListener.attach(xmlRecordService);
+    check xmlRecordListener.'start();
+    runtime:registerListener(xmlRecordListener);
+
+    runtime:sleep(3);
+
+    xmlRecordCounter = 0;
+    capturedXmlRecordContent = ();
+    capturedXmlRecordFileName = ();
+
+    string xmlContent = "<config><database>mysql</database><timeout>30</timeout></config>";
+    error? putResult = smbClient->putBytes("/xml_record_tests/db_config.xml", xmlContent.toBytes());
+    test:assertEquals(putResult, ());
+
+    runtime:sleep(5);
+    check xmlRecordListener.immediateStop();
+
+    test:assertTrue(xmlRecordCounter >= 1, "onFileXml with record type should be triggered at least once");
+    XmlConfig? recordData = capturedXmlRecordContent;
+    if recordData is XmlConfig {
+        test:assertEquals(recordData.database, "mysql", "Database field should match");
+        test:assertEquals(recordData.timeout, 30, "Timeout field should match");
+    } else {
+        test:assertFail("XML record content should be captured");
+    }
+    test:assertEquals(capturedXmlRecordFileName, "db_config.xml", "File name should match");
+
+    error? cleanupResult = smbClient->rmdir("xml_record_tests");
 }
