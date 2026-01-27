@@ -26,18 +26,6 @@ public isolated client class Caller {
         self.'client = 'client;
     }
 
-    # Adds a file to an SMB share.
-    # ```ballerina
-    # smb:Error? response = caller->put(path, content);
-    # ```
-    #
-    # + path - The resource path
-    # + content - Content to be written to the file in server
-    # + return - `()` or else an `smb:Error` if failed to establish the communication with the SMB server
-    remote isolated function put(string path, byte[] content) returns Error? {
-        return self.'client->put(path, content);
-    }
-
     # Writes byte array content to a file on an SMB share.
     # ```ballerina
     # smb:Error? response = caller->putBytes(path, content, smb:OVERWRITE);

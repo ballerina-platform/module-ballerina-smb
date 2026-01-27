@@ -272,17 +272,6 @@ public class SmbClient {
         });
     }
 
-    public static Object put(Environment env, BObject clientEndpoint, BString path, BArray inputContent) {
-        return env.yieldAndRun(() -> {
-            try {
-                writeFileBytes(clientEndpoint, path.getValue(),  inputContent.getByteArray(), false);
-            } catch (Exception exception) {
-                return SmbUtil.createError(FILE_WRITE_ERROR + exception.getMessage(), SMB_ERROR);
-            }
-            return null;
-        });
-    }
-
     public static Object list(Environment env, BObject clientEndpoint, BString directoryPath) {
         return env.yieldAndRun(() -> {
             try {

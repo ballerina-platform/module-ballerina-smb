@@ -142,7 +142,7 @@ function testSmbListenerOnCreate() returns error? {
     error? result = smbClient->mkdir("ListenerTest1");
     test:assertEquals(result, ());
 
-    error? putResult = smbClient->put("/ListenerTest1/testFile1.txt", "Test file content 1.".toBytes());
+    error? putResult = smbClient->putBytes("/ListenerTest1/testFile1.txt", "Test file content 1.".toBytes());
     test:assertEquals(putResult, ());
 
     runtime:sleep(3);
@@ -162,9 +162,9 @@ function testSmbListenerMultipleFiles() returns error? {
     error? mkdirResult = smbClient->mkdir("test2");
     test:assertEquals(mkdirResult, ());
 
-    error? put1 = smbClient->put("/test2/file1.txt", "Content 1".toBytes());
-    error? put2 = smbClient->put("/test2/file2.txt", "Content 2".toBytes());
-    error? put3 = smbClient->put("/test2/file3.txt", "Content 3".toBytes());
+    error? put1 = smbClient->putBytes("/test2/file1.txt", "Content 1".toBytes());
+    error? put2 = smbClient->putBytes("/test2/file2.txt", "Content 2".toBytes());
+    error? put3 = smbClient->putBytes("/test2/file3.txt", "Content 3".toBytes());
     test:assertEquals(put1, ());
     test:assertEquals(put2, ());
     test:assertEquals(put3, ());
@@ -397,7 +397,7 @@ function testOnFileTextHandler() returns error? {
     capturedTextFileName = ();
 
     string testContent = "Hello, this is a text file content for testing!";
-    error? putResult = smbClient->put("/content_tests/test_file.txt", testContent.toBytes());
+    error? putResult = smbClient->putBytes("/content_tests/test_file.txt", testContent.toBytes());
     test:assertEquals(putResult, ());
 
     runtime:sleep(5);
@@ -439,7 +439,7 @@ function testOnFileJsonHandler() returns error? {
         "age": 30,
         "email": "john@example.com"
     };
-    error? putResult = smbClient->put("/content_tests/user_data.json", testJson.toString().toBytes());
+    error? putResult = smbClient->putBytes("/content_tests/user_data.json", testJson.toString().toBytes());
     test:assertEquals(putResult, ());
     runtime:sleep(5);
     check jsonListener.immediateStop();
@@ -477,7 +477,7 @@ function testOnFileXmlHandler() returns error? {
     runtime:registerListener(xmlListener);
 
     string xmlContent = "<config><database>mysql</database><timeout>30</timeout></config>";
-    error? putResult = smbClient->put("/content_tests/config.xml", xmlContent.toBytes());
+    error? putResult = smbClient->putBytes("/content_tests/config.xml", xmlContent.toBytes());
     test:assertEquals(putResult, ());
     runtime:sleep(5);
     check xmlListener.immediateStop();
@@ -519,7 +519,7 @@ function testOnFileCsvHandler() returns error? {
     capturedCsvFileName = ();
 
     string csvContent = "id,name,email\n1,John,john@example.com\n2,Jane,jane@example.com";
-    error? putResult = smbClient->put("/content_tests/users.csv", csvContent.toBytes());
+    error? putResult = smbClient->putBytes("/content_tests/users.csv", csvContent.toBytes());
     test:assertEquals(putResult, ());
     runtime:sleep(5);
     check csvListener.immediateStop();
@@ -570,7 +570,7 @@ function testOnFileCsvRecordArrayHandler() returns error? {
     capturedCsvRecordArray = ();
     capturedCsvRecordArrayFileName = ();
     string csvContent = "id,name,email\n1,Alice,alice@example.com\n2,Bob,bob@example.com\n3,Charlie,charlie@example.com";
-    error? putResult = smbClient->put("/content_tests/csv_record_array/record_users.csv", csvContent.toBytes());
+    error? putResult = smbClient->putBytes("/content_tests/csv_record_array/record_users.csv", csvContent.toBytes());
     test:assertEquals(putResult, ());
 
     runtime:sleep(5);
@@ -622,7 +622,7 @@ function testOnFileCsvStringStreamHandler() returns error? {
     capturedCsvStringStreamFileName = ();
 
     string csvContent = "id,name,email\n10,Dave,dave@example.com\n20,Eve,eve@example.com\n30,Frank,frank@example.com\n40,Grace,grace@example.com";
-    error? putResult = smbClient->put("/content_tests/csv_string_stream/stream_users.csv", csvContent.toBytes());
+    error? putResult = smbClient->putBytes("/content_tests/csv_string_stream/stream_users.csv", csvContent.toBytes());
     test:assertEquals(putResult, ());
 
     runtime:sleep(5);
@@ -668,7 +668,7 @@ function testOnFileCsvRecordStreamHandler() returns error? {
     capturedCsvRecordStreamFileName = ();
 
     string csvContent = "id,name,email\n100,Henry,henry@example.com\n200,Ivy,ivy@example.com\n300,Jack,jack@example.com";
-    error? putResult = smbClient->put("/content_tests/csv_record_stream/record_stream_users.csv", csvContent.toBytes());
+    error? putResult = smbClient->putBytes("/content_tests/csv_record_stream/record_stream_users.csv", csvContent.toBytes());
     test:assertEquals(putResult, ());
 
     runtime:sleep(5);
@@ -711,7 +711,7 @@ function testOnFileHandler() returns error? {
     capturedBinaryFileName = ();
 
     byte[] binaryContent = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
-    error? putResult = smbClient->put("/content_tests/image.png", binaryContent);
+    error? putResult = smbClient->putBytes("/content_tests/image.png", binaryContent);
     test:assertEquals(putResult, ());
     runtime:sleep(5);
 
@@ -767,7 +767,7 @@ function testOnFileByteStreamHandler() returns error? {
         largeContent.push(<byte>(i % 256));
         i += 1;
     }
-    error? putResult = smbClient->put("/content_tests/byte_stream/large_binary.dat", largeContent);
+    error? putResult = smbClient->putBytes("/content_tests/byte_stream/large_binary.dat", largeContent);
     test:assertEquals(putResult, ());
     runtime:sleep(5);
 

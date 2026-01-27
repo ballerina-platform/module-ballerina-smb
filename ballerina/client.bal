@@ -37,18 +37,6 @@ public isolated client class Client {
         }
     }
 
-    # Adds a file to an SMB share.
-    # ```ballerina
-    # smb:Error? response = client->put(path, channel);
-    # ```
-    #
-    # + path - The resource path
-    # + content - Content to be written to the file in server
-    # + return - `()` or else an `smb:Error` if failed to establish the communication with the SMB server
-    remote isolated function put(string path, byte[] content) returns Error? = @java:Method {
-        'class: "io.ballerina.stdlib.smb.client.SmbClient"
-    } external;
-
     # Writes byte array content to a file on an SMB share.
     # ```ballerina
     # smb:Error? response = client->putBytes(path, content, smb:OVERWRITE);
@@ -103,7 +91,7 @@ public isolated client class Client {
     # + content - JSON content to write
     # + option - File write option (OVERWRITE or APPEND)
     # + return - `()` or else an `smb:Error` if the operation fails
-    remote isolated function putJson(string path, json|record {} content, FileWriteOption option = OVERWRITE)
+    remote isolated function putJson(string path, json|record {|json...;|} content, FileWriteOption option = OVERWRITE)
             returns Error? {
         return self->putText(path, content.toString(), option);
     }
@@ -118,7 +106,7 @@ public isolated client class Client {
     # + content - XML content to write
     # + option - File write option (OVERWRITE or APPEND)
     # + return - `()` or else an `smb:Error` if the operation fails
-    remote isolated function putXml(string path, xml|record {} content, FileWriteOption option = OVERWRITE)
+    remote isolated function putXml(string path, xml|record {|json...;|} content, FileWriteOption option = OVERWRITE)
             returns Error? {
         string xmlString;
         if content is xml {

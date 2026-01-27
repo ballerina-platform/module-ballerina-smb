@@ -49,7 +49,7 @@ function testListFiles() returns error? {
     dependsOn: [testCreateDirectory]
 }
 function testCreateFile() returns error? {
-    error? putResult = smbClient->put("/testFile.txt", "This is a test file.".toBytes());
+    error? putResult = smbClient->putBytes("/testFile.txt", "This is a test file.".toBytes());
     test:assertEquals(putResult, ());
 }
 
