@@ -20,6 +20,7 @@ package io.ballerina.stdlib.smb.util;
 
 import io.ballerina.lib.data.xmldata.xml.Native;
 import io.ballerina.runtime.api.Environment;
+import io.ballerina.runtime.api.Module;
 import io.ballerina.runtime.api.creators.TypeCreator;
 import io.ballerina.runtime.api.creators.ValueCreator;
 import io.ballerina.runtime.api.types.ArrayType;
@@ -34,6 +35,7 @@ import io.ballerina.runtime.api.values.BArray;
 import io.ballerina.runtime.api.values.BError;
 import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BString;
+import io.ballerina.runtime.api.values.BTypedesc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,16 +78,24 @@ public final class SmbContentConverter {
             if (targetType.getQualifiedName().equals(XML)) {
                 return XmlUtils.parse(StringUtils.fromString(new String(content, StandardCharsets.UTF_8)));
             }
-            BMap<BString, Object> options = ValueCreator.createMapValue();
-            Object bXml = Native.parseBytes(
-                    ValueCreator.createArrayValue(content), options, ValueCreator.createTypedescValue(targetType));
-            if (TypeUtils.getType(bXml).getTag() == TypeTags.ERROR_TAG) {
+            BMap<BString, Object> options = createXmlParseOptions(laxDataBinding);
+            BTypedesc typedesc = ValueCreator.createTypedescValue(targetType);
+            Object bXml = Native.parseBytes(ValueCreator.createArrayValue(content), options, typedesc);
+            if (bXml instanceof BError) {
                 return SmbUtil.createError(((BError) bXml).getErrorMessage().getValue(), SMB_ERROR);
             }
             return bXml;
         } catch (BError e) {
             return SmbUtil.createError(e.getErrorMessage().getValue(), SMB_ERROR);
         }
+    }
+
+    private static BMap<BString, Object> createXmlParseOptions(boolean laxDataBinding) {
+        BMap<BString, Object> mapValue = ValueCreator.createRecordValue(
+                new Module("ballerina", "data.xmldata", "1"),
+                "SourceOptions");
+        mapValue.put(StringUtils.fromString("allowDataProjection"), laxDataBinding);
+        return mapValue;
     }
 
     public static Object convertBytesToCsv(Environment env, byte[] content, Type targetType, boolean laxDataBinding,

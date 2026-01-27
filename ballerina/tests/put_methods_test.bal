@@ -36,6 +36,12 @@ type Person record {|
     string city;
 |};
 
+
+type Book record {|
+    string title;
+    string author;
+|};
+
 @test:BeforeSuite
 function setupTestDirectory() returns error? {
     Error? mkdirResult = testClient->mkdir("test");
@@ -362,6 +368,51 @@ function testPutXmlRecord() returns error? {
         test:assertTrue(result.includes("<city>Chicago</city>"));
     }
 }
+
+@test:Config {
+    groups: ["put", "getXml", "getXmlAsRecord"],
+    dependsOn: [testPutXmlRecord]
+}
+function testGetXmlAsRecord() returns error? {
+    string path = "/test/get-xml-as-record.xml";
+    xml content = xml `<Book><title>The Great Gatsby</title><author>F. Scott Fitzgerald</author></Book>`;
+    check testClient->putXml(path, content, OVERWRITE);
+    Book|Error result = testClient->getXml(path);
+    test:assertTrue(result is Book, "Failed to read XML as record type");
+    if result is Book {
+        test:assertEquals(result.title, "The Great Gatsby", "Title mismatch");
+        test:assertEquals(result.author, "F. Scott Fitzgerald", "Author mismatch");
+    }
+}
+
+@test:Config {
+    groups: ["put", "getXml", "getXmlAsRecord"],
+    dependsOn: [testGetXmlAsRecord]
+}
+function testGetXmlAsNestedRecord() returns error? {
+    string path = "/test/get-xml-as-nested-record.xml";
+    xml content = xml `<Employee><name>Jane Doe</name><department>Engineering</department><address><city>Seattle</city><zip>98101</zip></address></Employee>`;
+    check testClient->putXml(path, content, OVERWRITE);
+    EmployeeRecord|Error result = testClient->getXml(path);
+    test:assertTrue(result is EmployeeRecord, "Failed to read XML as nested record type");
+    if result is EmployeeRecord {
+        test:assertEquals(result.name, "Jane Doe", "Name mismatch");
+        test:assertEquals(result.department, "Engineering", "Department mismatch");
+        test:assertEquals(result.address.city, "Seattle", "City mismatch");
+        test:assertEquals(result.address.zip, "98101", "Zip mismatch");
+    }
+}
+
+type Address record {|
+    string city;
+    string zip;
+|};
+
+type EmployeeRecord record {|
+    string name;
+    string department;
+    Address address;
+|};
 
 @test:Config {
     groups: ["put", "putCsv"]
