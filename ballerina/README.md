@@ -6,7 +6,7 @@ The module supports SMB protocol versions `2.0.2` through `3.1.1`, with features
 
 ### SMB client
 
-The `smb:Client` connects to an SMB server and performs various operations on files and directories. It supports the following operations: `get`, `delete`, `patch`, `mkdir`, `rmdir`, `isDirectory`, `rename`, `move`, `copy`, `size`, `exists`, and `list`. The client also provides typed data operations for reading and writing files as text, JSON, XML, CSV, and binary data, with streaming support for handling large files efficiently.
+The `smb:Client` connects to an SMB server and performs various operations on files and directories. It supports the following operations: `get`, `delete`, `put`, `patch`, `mkdir`, `rmdir`, `isDirectory`, `rename`, `move`, `copy`, `size`, `exists`, and `list`. The client also provides typed data operations for reading and writing files as text, JSON, XML, CSV, and binary data, with streaming support for handling large files efficiently.
 
 An SMB client is defined using the `host` and `share` parameters and optionally, the `port` and `auth`. Authentication configuration can be configured using the `auth` parameter for NTLM credentials or Kerberos authentication.
 
@@ -41,7 +41,7 @@ smb:ClientConfiguration smbConfig = {
     share: "<The SMB share name>",
     auth: {
         kerberosConfig: {
-            principal: "<user@REALM.COM>",
+            principal: "user@REALM.COM",
             keytab: "/path/to/user.keytab",
             configFile: "/path/to/krb5.conf"
         }
@@ -61,35 +61,165 @@ smb:Error? mkdirResponse = smbClient->mkdir("<The directory path>");
 
 ##### Upload a file to a remote server
 
-The following code uploads a file to a remote SMB share. 
+The following code uploads a file to a remote SMB share.
+
+```ballerina
+byte[] fileContent = check io:fileReadBytes(putFilePath);
+smb:Error? putResponse = smbClient->put("<The resource path>", fileContent);
+```
+
+You can also upload files as specific types:
+
+**Upload as text:**
 
 ```ballerina
 smb:Error? result = smbClient->putText("<The file path>", "Hello, World!");
 ```
 
-You can use the following methods to upload files with specific types.
-
-- `putText`
-- `putJson`
-- `putXml`
-- `putCsv`
-- `putBytes`
-
-##### Retrieve files from remote server
-
-The following code retrieves a file from a remote SMB share as text.
+**Upload as JSON or record:**
 
 ```ballerina
-string|smb:Error content = smbClient->getText("<The file path>");
+json jsonData = {name: "John", age: 30};
+smb:Error? result = smbClient->putJson("<The file path>", jsonData);
+
+type User record {
+    string name;
+    int age;
+};
+
+User user = {name: "Jane", age: 25};
+smb:Error? result = smbClient->putJson("<The file path>", user);
 ```
 
-You can use the following methods to retrieve files with specific types.
+**Upload as XML:**
 
-- `getText`
-- `getJson`
-- `getXml`
-- `getCsv`
-- `getBytes`
+```ballerina
+xml xmlData = xml `<config><database>mydb</database></config>`;
+smb:Error? result = smbClient->putXml("<The file path>", xmlData);
+```
+
+**Upload as CSV (string arrays or typed records):**
+
+```ballerina
+string[][] csvData = [["Name", "Age"], ["John", "30"], ["Jane", "25"]];
+smb:Error? result = smbClient->putCsv("<The file path>", csvData);
+
+type Person record {
+    string name;
+    int age;
+};
+
+Person[] people = [{name: "John", age: 30}, {name: "Jane", age: 25}];
+smb:Error? result = smbClient->putCsv("<The file path>", people);
+```
+
+**Upload as bytes:**
+
+```ballerina
+byte[] binaryData = [0x48, 0x65, 0x6C, 0x6C, 0x6F]; // "Hello"
+smb:Error? result = smbClient->putBytes("<The file path>", binaryData);
+```
+
+##### Write at a specific offset
+
+The following code writes content at a specific offset in a file without overwriting the entire file.
+
+```ballerina
+byte[] patchContent = "patched content".toBytes();
+smb:Error? patchResponse = smbClient->patch("<The file path>", patchContent, <offset>);
+```
+
+##### Get the size of a remote file
+
+The following code gets the size of a file in a remote SMB share.
+
+```ballerina
+int|smb:Error sizeResponse = smbClient->size("<The resource path>");
+```
+
+##### Check if a file exists
+
+The following code checks if a file or directory exists in the remote SMB share.
+
+```ballerina
+boolean|smb:Error existsResponse = smbClient->exists("<The resource path>");
+```
+
+##### Read the content of a remote file
+
+The following code reads the content of a file in a remote SMB share. The SMB client supports various data types including text, JSON, XML, CSV, and binary data through typed get operations.
+
+```ballerina
+string fileContent = check smbClient->getText("<The file path>");
+```
+
+**Read as JSON or typed record:**
+
+```ballerina
+json jsonData = check smbClient->getJson("<The file path>");
+
+type User record {
+    string name;
+    int age;
+};
+
+User userData = check smbClient->getJson("<The file path>");
+```
+
+**Read as XML or typed record:**
+
+```ballerina
+xml xmlData = check smbClient->getXml("<The file path>");
+
+type Config record {
+    string database;
+    int timeout;
+};
+
+Config config = check smbClient->getXml("<The file path>");
+```
+
+**Read as CSV (string arrays or typed records):**
+
+```ballerina
+string[][] csvData = check smbClient->getCsv("<The file path>");
+
+type CsvRecord record {
+    string id;
+    string name;
+    string email;
+};
+
+CsvRecord[] records = check smbClient->getCsv("<The file path>");
+```
+
+**Read as bytes:**
+
+```ballerina
+byte[] fileBytes = check smbClient->getBytes("<The file path>");
+
+stream<byte[], error?> byteStream = check smbClient->getBytesAsStream("<The file path>");
+record {|byte[] value;|}? nextBytes = check byteStream.next();
+check byteStream.close();
+```
+
+##### Rename/move a remote file
+
+The following code renames or moves a file to another location in the same remote SMB share.
+
+```ballerina
+smb:Error? renameResponse = smbClient->rename("<The source file path>",
+    "<The destination file path>");
+```
+
+##### Copy a remote file
+
+The following code copies a file to another location in the same remote SMB share.
+
+```ballerina
+smb:Error? copyResponse = smbClient->copy("<The source file path>",
+    "<The destination file path>");
+```
 
 ##### Delete a remote file
 
@@ -99,15 +229,44 @@ The following code deletes a remote file in a remote SMB share.
 smb:Error? deleteResponse = smbClient->delete("<The resource path>");
 ```
 
+##### Remove a directory from a remote server
+
+The following code removes a directory in a remote SMB share.
+
+```ballerina
+smb:Error? rmdirResponse = smbClient->rmdir("<The directory path>");
+```
+
+##### List files in a directory
+
+The following code lists files and directories in a remote SMB share.
+
+```ballerina
+smb:FileInfo[]|smb:Error listResponse = smbClient->list("<The directory path>");
+```
+
+### SMB Caller
+
+The `smb:Caller` provides a convenience wrapper for interacting with SMB servers from within file handlers. It offers the same API as the `smb:Client` but is designed specifically for use within listener service methods. The caller is passed as an optional parameter to handler methods.
+
+```ballerina
+service on remoteServer {
+    remote function onFileJson(json content, smb:FileInfo fileInfo, smb:Caller caller) returns error? {
+        check caller->putJson("/processed/" + fileInfo.name, content);
+        check caller->move(fileInfo.path, "/archive/" + fileInfo.name);
+    }
+}
+```
+
+The caller supports all client operations including `putBytes`, `putText`, `putJson`, `putXml`, `putCsv`, `getBytes`, `getText`, `getJson`, `getXml`, `getCsv`, `getBytesAsStream`, `getCsvAsStream`, `list`, `mkdir`, `rmdir`, `rename`, `move`, `copy`, `exists`, `size`, `isDirectory`, `delete`, and `patch`.
+
 ### SMB listener
 
-The `smb:Listener` is used to listen to a remote SMB share location and trigger events when new files are added to or deleted from the directory. The listener supports both a generic `onFile` handler for file system events and format-specific content handlers (`onFileText`, `onFileJson`, `onFileXml`, `onFileCsv`, `onFile`) that automatically deserialize file content based on the file type.
+The `smb:Listener` is used to listen to a remote SMB share location and trigger events when new files are added to or deleted from the directory. The listener supports both a generic `onFileChange` handler for file system events and format-specific content handlers (`onFileText`, `onFileJson`, `onFileXml`, `onFileCsv`, `onFile`) that automatically deserialize file content based on the file type.
 
-An SMB listener is defined using the mandatory `host` and `share` parameters. The authentication configuration can be done using the `auth` parameter and the polling interval can be configured using the `pollingInterval` parameter. The default polling interval is 60 seconds.
+An SMB listener is defined using the mandatory `host`, `share`, and `path` parameters. The authentication configuration can be done using the `auth` parameter and the polling interval can be configured using the `pollingInterval` parameter. The default polling interval is 60 seconds.
 
 The `fileNamePattern` parameter can be used to define the type of files the SMB listener will listen to. For instance, if the listener gets invoked for text files, the value `(.*).txt` can be given for the config.
-
-The directory path within the SMB share is configured using the `@smb:ServiceConfig` annotation on the service.
 
 #### Create a listener
 
@@ -118,6 +277,7 @@ listener smb:Listener remoteServer = check new({
     host: "<The SMB host>",
     port: <The SMB port>,
     share: "<The SMB share name>",
+    path: "<The remote SMB directory location>",
     pollingInterval: <Polling interval>,
     auth: {
         credentials: {
@@ -134,9 +294,6 @@ The SMB listener supports content handler methods that automatically deserialize
 **Handle text files:**
 
 ```ballerina
-@smb:ServiceConfig {
-    path: "<The remote SMB directory location>"
-}
 service on remoteServer {
     remote function onFileText(string content, smb:FileInfo fileInfo) returns error? {
         log:printInfo("Text file: " + fileInfo.path);
@@ -248,6 +405,78 @@ service on remoteServer {
 
 The SMB listener automatically routes files to the appropriate content handler based on file extension: `.txt` -> `onFileText()`, `.json` -> `onFileJson()`, `.xml` -> `onFileXml()`, `.csv` -> `onFileCsv()`, and other extensions -> `onFile()` (fallback handler). You can override the default routing using the `@smb:FunctionConfig` annotation to specify a custom file name pattern for each handler method.
 
+#### Service configuration
+
+Use the `@smb:ServiceConfig` annotation to specify a custom directory path within the SMB share that the service should monitor. If not specified, the service name is used as the path.
+
+```ballerina
+@smb:ServiceConfig {
+    path: "/data/incoming"
+}
+service on remoteServer {
+    remote function onFileJson(json content, smb:FileInfo fileInfo) returns error? {
+        log:printInfo("File received in /data/incoming: " + fileInfo.name);
+    }
+}
+```
+
+#### Custom file name patterns
+
+Use the `@smb:FunctionConfig` annotation to override the default extension-based routing and specify custom file name patterns for handler methods.
+
+```ballerina
+service on remoteServer {
+    // Handle only files matching the pattern "report_*.json"
+    @smb:FunctionConfig {
+        fileNamePattern: "report_(.*).json"
+    }
+    remote function onFileJson(json content, smb:FileInfo fileInfo) returns error? {
+        log:printInfo("Report file: " + fileInfo.name);
+    }
+
+    // Handle log files with custom pattern
+    @smb:FunctionConfig {
+        fileNamePattern: "(.*).log"
+    }
+    remote function onFileText(string content, smb:FileInfo fileInfo) returns error? {
+        log:printInfo("Log file content: " + content);
+    }
+}
+```
+
+#### Handle file change events
+
+Use the `onFileChange` handler to receive generic file system events with information about added and deleted files.
+
+```ballerina
+service on remoteServer {
+    remote function onFileChange(smb:WatchEvent event) returns error? {
+        foreach smb:FileInfo file in event.addedFiles {
+            log:printInfo("File added: " + file.path);
+        }
+        foreach string deletedFile in event.deletedFiles {
+            log:printInfo("File deleted: " + deletedFile);
+        }
+    }
+}
+```
+
+#### Handle errors
+
+Use the `onError` handler to receive and handle errors that occur during file processing.
+
+```ballerina
+service on remoteServer {
+    remote function onFileJson(json content, smb:FileInfo fileInfo) returns error? {
+        // Process JSON file
+    }
+
+    remote function onError(error err) {
+        log:printError("Error occurred while processing file", 'error = err);
+    }
+}
+```
+
 ### Advanced configuration options
 
 The SMB client and listener support several advanced configuration options:
@@ -308,4 +537,27 @@ smb:ClientConfiguration smbConfig = {
     bufferSize: 131072,
     connectTimeout: 60.0
 };
+```
+
+##### Relaxed data binding
+
+Enable relaxed data binding to allow flexible parsing of JSON, XML, and CSV content. When enabled, the parser will ignore unknown fields and use default values for missing fields instead of returning errors.
+
+```ballerina
+smb:ClientConfiguration smbConfig = {
+    host: "<The SMB host>",
+    share: "<The SMB share name>",
+    laxDataBinding: true
+};
+
+smb:Client smbClient = check new(smbConfig);
+
+// With laxDataBinding enabled, this will succeed even if the JSON
+// contains extra fields not defined in the User record
+type User record {
+    string name;
+    int age;
+};
+
+User user = check smbClient->getJson("/users/data.json");
 ```
