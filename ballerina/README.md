@@ -8,7 +8,7 @@ The module supports SMB protocol versions `2.0.2` through `3.1.1`, with features
 
 The `smb:Client` connects to an SMB server and performs various operations on files and directories. It supports the following operations: `get`, `delete`, `put`, `patch`, `mkdir`, `rmdir`, `isDirectory`, `rename`, `move`, `copy`, `size`, `exists`, and `list`. The client also provides typed data operations for reading and writing files as text, JSON, XML, CSV, and binary data, with streaming support for handling large files efficiently.
 
-An SMB client is defined using the `host` and `share` parameters and optionally, the `port` and `auth`. Authentication configuration can be configured using the `auth` parameter for NTLM credentials or Kerberos authentication.
+An SMB client is defined using the `host` and `share` parameters and optionally, the `port` and `auth`. Authentication can be configured using the `auth` parameter for NTLM credentials or Kerberos authentication.
 
 #### Create a client
 
