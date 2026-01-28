@@ -558,12 +558,12 @@ smb:ClientConfiguration smbConfig = {
 
 smb:Client smbClient = check new(smbConfig);
 
-// With laxDataBinding enabled, this will succeed even if the JSON
-// contains extra fields not defined in the User record
-type User record {
+type User record {|
     string name;
     int age;
-};
+    string country; // fields not in the result will be mapped to default/empty values
+    int postalCode;
+|};
 
 User user = check smbClient->getJson("/users/data.json");
 ```
