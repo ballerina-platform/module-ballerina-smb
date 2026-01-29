@@ -31,7 +31,6 @@ import com.hierynomus.smbj.connection.Connection;
 import com.hierynomus.smbj.session.Session;
 import com.hierynomus.smbj.share.DiskShare;
 import com.hierynomus.smbj.share.File;
-import io.ballerina.lib.data.csvdata.csv.Native;
 import io.ballerina.runtime.api.Environment;
 import io.ballerina.runtime.api.Module;
 import io.ballerina.runtime.api.concurrent.StrandMetadata;
@@ -60,6 +59,7 @@ import io.ballerina.runtime.api.values.BString;
 import io.ballerina.stdlib.smb.iterator.ByteIterator;
 import io.ballerina.stdlib.smb.iterator.CsvIterator;
 import io.ballerina.stdlib.smb.util.ModuleUtils;
+import io.ballerina.stdlib.smb.util.SmbContentConverter;
 import io.ballerina.stdlib.smb.util.SmbUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -162,6 +162,8 @@ public class SmbListenerHelper {
     public static final String CLIENT = "Client";
     public static final String REGISTER_SERVICE_ERROR = "Failed to register service: ";
     public static final String LISTENER_NOT_INITIALIZED_ERROR = "Listener is not initialized";
+    public static final String ENDPOINT_CONFIG_CSV_FAIL_SAFE = "csvFailSafe";
+    public static final String ENDPOINT_CONFIG_LAX_DATA_BINDING = "laxDataBinding";
 
     private SmbListenerHelper() {
     }
@@ -596,7 +598,7 @@ public class SmbListenerHelper {
             }
 
             Type contentParamType = parameters[0].type;
-            Object content = readFileContent(env, diskShare, filePath, methodName, contentParamType);
+            Object content = readFileContent(env, diskShare, filePath, methodName, contentParamType, listenerConfig);
 
             if (TypeUtils.getType(content).getTag() == TypeTags.ERROR_TAG) {
                 log.error("Error reading file content: {}", ((BError) content).getErrorMessage().getValue());
@@ -634,7 +636,7 @@ public class SmbListenerHelper {
     }
 
     private static Object readFileContent(Environment env, DiskShare diskShare, String filePath, String methodName,
-                                           Type contentParamType) {
+                                           Type contentParamType, BMap<BString, Object> listenerConfig) {
         try {
             String normalizedPath = filePath.startsWith(SLASH_SUFFIX) ? filePath.substring(1) : filePath;
             Set<AccessMask> accessMask = new HashSet<>();
@@ -653,18 +655,22 @@ public class SmbListenerHelper {
                     default -> {
                         inputStream.close();
                         file.close();
-                        yield readFileContentAsBytes(env, diskShare, normalizedPath, methodName, contentParamType);
+                        yield readFileContentAsBytes(env, diskShare, normalizedPath, methodName, contentParamType,
+                                listenerConfig, filePath);
                     }
                 };
             }
-            return readFileContentAsBytes(env, diskShare, normalizedPath, methodName, contentParamType);
+            return readFileContentAsBytes(env, diskShare, normalizedPath, methodName, contentParamType,
+                    listenerConfig, filePath);
         } catch (IOException e) {
             return SmbUtil.createError(FILE_READ_ERROR + e.getMessage(), SMB_ERROR);
         }
     }
 
     private static Object readFileContentAsBytes(Environment env, DiskShare diskShare, String normalizedPath,
-                                                  String methodName, Type contentParamType) throws IOException {
+                                                  String methodName, Type contentParamType,
+                                                  BMap<BString, Object> listenerConfig, String filePath)
+            throws IOException {
         Set<AccessMask> accessMask = new HashSet<>();
         accessMask.add(AccessMask.GENERIC_READ);
         try (File file = diskShare.openFile(normalizedPath, accessMask, null,
@@ -682,7 +688,7 @@ public class SmbListenerHelper {
                 case ON_FILE_TEXT -> StringUtils.fromString(new String(bytes, StandardCharsets.UTF_8));
                 case ON_FILE_JSON -> parseJsonContent(bytes, contentParamType);
                 case ON_FILE_XML -> parseXmlContent(bytes, contentParamType);
-                case ON_FILE_CSV -> parseCsvContent(env, bytes, contentParamType);
+                case ON_FILE_CSV -> parseCsvContent(env, bytes, contentParamType, listenerConfig, filePath);
                 case ON_FILE -> parseByteContent(bytes, contentParamType);
                 default -> ValueCreator.createArrayValue(bytes);
             };
@@ -725,9 +731,15 @@ public class SmbListenerHelper {
         return mapValue;
     }
 
-    private static Object parseCsvContent(Environment env, byte[] bytes, Type targetType) {
+    private static Object parseCsvContent(Environment env, byte[] bytes, Type targetType,
+                                           BMap<BString, Object> listenerConfig, String filePath) {
         try {
             Type referredType = TypeUtils.getReferredType(targetType);
+            boolean laxDataBinding = listenerConfig != null &&
+                    listenerConfig.getBooleanValue(StringUtils.fromString(ENDPOINT_CONFIG_LAX_DATA_BINDING));
+            BMap<?, ?> csvFailSafe = listenerConfig != null ?
+                    listenerConfig.getMapValue(StringUtils.fromString(ENDPOINT_CONFIG_CSV_FAIL_SAFE)) : null;
+
             if (referredType.getTag() == TypeTags.STREAM_TAG) {
                 StreamType streamType = (StreamType) referredType;
                 Type constraintType = streamType.getConstrainedType();
@@ -737,10 +749,10 @@ public class SmbListenerHelper {
                     ArrayType arrayType = (ArrayType) referredConstraintType;
                     if (arrayType.getElementType().getTag() == TypeTags.STRING_TAG) {
                         return CsvIterator.createStringArrayStream(
-                                inputStream, constraintType, false);
+                                inputStream, constraintType, laxDataBinding);
                     }
                 }
-                return CsvIterator.createRecordStream(inputStream, constraintType, false);
+                return CsvIterator.createRecordStream(inputStream, constraintType, laxDataBinding);
             }
             if (referredType.getTag() == TypeTags.ARRAY_TAG) {
                 ArrayType arrayType = (ArrayType) referredType;
@@ -751,7 +763,9 @@ public class SmbListenerHelper {
                         return parseStringArrayArray(bytes);
                     }
                 }
-                return parseRecordArray(env, bytes, targetType);
+                String fileNamePrefix = SmbContentConverter.deriveFileNamePrefix(filePath);
+                return SmbContentConverter.convertBytesToCsv(env, bytes, targetType,
+                        laxDataBinding, csvFailSafe, fileNamePrefix);
             }
             return parseStringArrayArray(bytes);
         } catch (Exception e) {
@@ -795,22 +809,6 @@ public class SmbListenerHelper {
         ArrayType stringArrayType = TypeCreator.createArrayType(PredefinedTypes.TYPE_STRING);
         ArrayType arrayOfStringArraysType = TypeCreator.createArrayType(stringArrayType);
         return ValueCreator.createArrayValue(rows.toArray(new BArray[0]), arrayOfStringArraysType);
-    }
-
-    private static Object parseRecordArray(Environment env, byte[] bytes, Type targetType) {
-        try {
-            BMap<BString, Object> parseOptions = ValueCreator
-                    .createRecordValue(io.ballerina.lib.data.csvdata.utils.ModuleUtils.getModule(), "ParseOptions");
-            parseOptions.put(StringUtils.fromString("allowDataProjection"), false);
-            Object parsedValue = Native.parseBytes(env, ValueCreator.createArrayValue(bytes), parseOptions,
-                    ValueCreator.createTypedescValue(targetType));
-            if (TypeUtils.getType(parsedValue).getTag() == TypeTags.ERROR_TAG) {
-                return SmbUtil.createError(((BError) parsedValue).getErrorMessage().getValue(), SMB_ERROR);
-            }
-            return parsedValue;
-        } catch (Exception exception) {
-            return SmbUtil.createError(CSV_PARSE_ERROR + exception.getMessage(), SMB_ERROR);
-        }
     }
 
     private static Object parseByteContent(byte[] bytes, Type targetType) {

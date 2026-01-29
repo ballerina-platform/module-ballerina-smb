@@ -29,6 +29,8 @@ import ballerina/time;
 # + bufferSize - Size of the buffer for read/write operations in bytes
 # + connectTimeout - Connection timeout in seconds (default: 30.0)
 # + laxDataBinding - If set to `true`, enables relaxed data binding for XML, JSON, and CSV responses (default: false)
+# + csvFailSafe - Configuration for fail-safe CSV content processing. In the fail-safe mode,
+#                 malformed CSV records are skipped and written to a separate file in the current directory
 public type ClientConfiguration record {|
     string host = "localhost";
     int port = 445;
@@ -41,6 +43,7 @@ public type ClientConfiguration record {|
     int bufferSize = 65536;
     decimal connectTimeout = 30.0;
     boolean laxDataBinding = false;
+    FailSafeOptions csvFailSafe?;
 |};
 
 # File write options for write operations.
@@ -123,6 +126,8 @@ public type WatchEvent record {|
 # + bufferSize - Size of the buffer for read/write operations in bytes (default: 65536)
 # + connectTimeout - Connection timeout in seconds (default: 30.0)
 # + laxDataBinding - If set to `true`, enables relaxed data binding for XML and JSON responses (default: false)
+# + csvFailSafe - Configuration for fail-safe CSV content processing. In the fail-safe mode,
+#                 malformed CSV records are skipped and written to a separate file in the current directory
 public type ListenerConfiguration record {|
     string host = "localhost";
     int port = 445;
@@ -137,6 +142,7 @@ public type ListenerConfiguration record {|
     int bufferSize = 65536;
     decimal connectTimeout = 30.0;
     boolean laxDataBinding = false;
+    FailSafeOptions csvFailSafe?;
 |};
 
 # Configuration annotation for SMB content handler functions.
@@ -186,3 +192,17 @@ public type ContentCsvStringArrayStreamEntry record {|
 public type ContentCsvRecordStreamEntry record {|
     record {} value;
 |};
+
+# Fail-safe options for CSV content processing.
+#
+# + contentType - Specifies the type of content to log in case of errors
+public type FailSafeOptions record {|
+    ErrorLogContentType contentType = METADATA;
+|};
+
+# Specifies the type of content to log in case of errors during fail-safe CSV processing.
+public enum ErrorLogContentType {
+    METADATA,
+    RAW,
+    RAW_AND_METADATA
+}
