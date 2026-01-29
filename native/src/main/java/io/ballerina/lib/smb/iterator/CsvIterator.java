@@ -16,10 +16,11 @@
  * under the License.
  */
 
-package io.ballerina.stdlib.smb.iterator;
+package io.ballerina.lib.smb.iterator;
 
 import io.ballerina.lib.data.csvdata.csv.Native;
 import io.ballerina.lib.data.csvdata.utils.ModuleUtils;
+import io.ballerina.lib.smb.util.SmbUtil;
 import io.ballerina.runtime.api.Environment;
 import io.ballerina.runtime.api.creators.TypeCreator;
 import io.ballerina.runtime.api.creators.ValueCreator;
@@ -34,15 +35,14 @@ import io.ballerina.runtime.api.values.BError;
 import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BObject;
 import io.ballerina.runtime.api.values.BString;
-import io.ballerina.stdlib.smb.util.SmbUtil;
 
 import java.io.IOException;
 import java.io.InputStream;
 
-import static io.ballerina.stdlib.smb.iterator.ByteIterator.NATIVE_INPUT_STREAM;
-import static io.ballerina.stdlib.smb.iterator.ByteIterator.NATIVE_LAX_DATA_BINDING;
-import static io.ballerina.stdlib.smb.iterator.ByteIterator.NATIVE_STREAM_VALUE_TYPE;
-import static io.ballerina.stdlib.smb.client.SmbClient.SMB_ERROR;
+import static io.ballerina.lib.smb.client.SmbClient.SMB_ERROR;
+import static io.ballerina.lib.smb.iterator.ByteIterator.NATIVE_INPUT_STREAM;
+import static io.ballerina.lib.smb.iterator.ByteIterator.NATIVE_LAX_DATA_BINDING;
+import static io.ballerina.lib.smb.iterator.ByteIterator.NATIVE_STREAM_VALUE_TYPE;
 
 /**
  * Iterator utilities for streaming CSV content in SMB files.
@@ -69,7 +69,7 @@ public class CsvIterator {
      */
     public static Object createStringArrayStream(InputStream content, Type streamValueType, boolean laxDataBinding) {
         BObject contentCsvStreamObject = ValueCreator.createObjectValue(
-                io.ballerina.stdlib.smb.util.ModuleUtils.getModule(), "ContentCsvStringArrayStream", null, null
+                io.ballerina.lib.smb.util.ModuleUtils.getModule(), "ContentCsvStringArrayStream", null, null
         );
         contentCsvStreamObject.addNativeData(NATIVE_INPUT_STREAM, content);
         contentCsvStreamObject.addNativeData(NATIVE_LAX_DATA_BINDING, laxDataBinding);
@@ -89,7 +89,7 @@ public class CsvIterator {
      */
     public static Object createRecordStream(InputStream content, Type streamValueType, boolean laxDataBinding) {
         BObject contentCsvStreamObject = ValueCreator.createObjectValue(
-                io.ballerina.stdlib.smb.util.ModuleUtils.getModule(), "ContentCsvRecordStream", null, null
+                io.ballerina.lib.smb.util.ModuleUtils.getModule(), "ContentCsvRecordStream", null, null
         );
         contentCsvStreamObject.addNativeData(NATIVE_INPUT_STREAM, content);
         contentCsvStreamObject.addNativeData(NATIVE_LAX_DATA_BINDING, laxDataBinding);
@@ -111,7 +111,7 @@ public class CsvIterator {
         final Type elementType = (Type) recordIterator.getNativeData(NATIVE_STREAM_VALUE_TYPE);
         final String recordTypeName = resolveRecordTypeName(elementType);
         final BMap<BString, Object> streamEntry =
-                ValueCreator.createRecordValue(io.ballerina.stdlib.smb.util.ModuleUtils.getModule(), recordTypeName);
+                ValueCreator.createRecordValue(io.ballerina.lib.smb.util.ModuleUtils.getModule(), recordTypeName);
 
         Object dataIndex = recordIterator.getNativeData(KEY_INDEX);
         if (dataIndex == null) {

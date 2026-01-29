@@ -21,6 +21,6 @@ function init() {
 }
 
 function setModule() = @java:Method {
-    'class: "io.ballerina.stdlib.smb.util.ModuleUtils"
+    'class: "io.ballerina.lib.smb.util.ModuleUtils"
 } external;
 

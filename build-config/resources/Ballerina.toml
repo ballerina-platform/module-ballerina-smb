@@ -67,7 +67,7 @@ version = "@commons.vfs2.version@"
 path = "./lib/commons-vfs2-@commons.vfs2.version@.jar"
 
 [[platform.java21.dependency]]
-groupId = "io.ballerina.stdlib"
+groupId = "io.ballerina.lib"
 artifactId = "smb-native"
 version = "@toml.version@"
 path = "../native/build/libs/smb-native-@project.version@.jar"

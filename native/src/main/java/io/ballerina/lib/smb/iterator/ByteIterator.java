@@ -16,8 +16,10 @@
  * under the License.
  */
 
-package io.ballerina.stdlib.smb.iterator;
+package io.ballerina.lib.smb.iterator;
 
+import io.ballerina.lib.smb.util.ModuleUtils;
+import io.ballerina.lib.smb.util.SmbUtil;
 import io.ballerina.runtime.api.creators.TypeCreator;
 import io.ballerina.runtime.api.creators.ValueCreator;
 import io.ballerina.runtime.api.types.PredefinedTypes;
@@ -26,15 +28,13 @@ import io.ballerina.runtime.api.utils.StringUtils;
 import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BObject;
 import io.ballerina.runtime.api.values.BString;
-import io.ballerina.stdlib.smb.util.ModuleUtils;
-import io.ballerina.stdlib.smb.util.SmbUtil;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 
-import static io.ballerina.stdlib.smb.client.SmbClient.SMB_ERROR;
+import static io.ballerina.lib.smb.client.SmbClient.SMB_ERROR;
 
 /**
  * Utility class for iterating over byte stream content from SMB files.

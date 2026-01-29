@@ -16,7 +16,7 @@
  * under the License.
  */
 
-module io.ballerina.stdlib.smb {
+module io.ballerina.lib.smb {
     requires io.ballerina.runtime;
     requires io.ballerina.lang;
     requires io.ballerina.stdlib.io;
@@ -28,8 +28,8 @@ module io.ballerina.stdlib.smb {
     requires io.ballerina.lib.data.xmldata;
     requires io.ballerina.lib.data.csvdata;
     requires com.hierynomus.smbj;
-    exports io.ballerina.stdlib.smb.client;
-    exports io.ballerina.stdlib.smb.server;
-    exports io.ballerina.stdlib.smb.util;
-    exports io.ballerina.stdlib.smb.iterator;
+    exports io.ballerina.lib.smb.client;
+    exports io.ballerina.lib.smb.server;
+    exports io.ballerina.lib.smb.util;
+    exports io.ballerina.lib.smb.iterator;
 }

@@ -16,13 +16,13 @@
  * under the License.
  */
 
-package io.ballerina.stdlib.smb.util;
+package io.ballerina.lib.smb.util;
 
 import io.ballerina.runtime.api.Environment;
 import io.ballerina.runtime.api.Module;
 
-import static io.ballerina.stdlib.smb.client.SmbClient.SMB_MODULE_NAME;
-import static io.ballerina.stdlib.smb.client.SmbClient.SMB_ORG_NAME;
+import static io.ballerina.lib.smb.client.SmbClient.SMB_MODULE_NAME;
+import static io.ballerina.lib.smb.client.SmbClient.SMB_ORG_NAME;
 
 /**
  * Module utility class for SMB.

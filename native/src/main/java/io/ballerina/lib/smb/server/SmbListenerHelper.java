@@ -16,7 +16,7 @@
  * under the License.
  */
 
-package io.ballerina.stdlib.smb.server;
+package io.ballerina.lib.smb.server;
 
 import com.hierynomus.msdtyp.AccessMask;
 import com.hierynomus.msfscc.FileAttributes;
@@ -31,6 +31,11 @@ import com.hierynomus.smbj.connection.Connection;
 import com.hierynomus.smbj.session.Session;
 import com.hierynomus.smbj.share.DiskShare;
 import com.hierynomus.smbj.share.File;
+import io.ballerina.lib.smb.iterator.ByteIterator;
+import io.ballerina.lib.smb.iterator.CsvIterator;
+import io.ballerina.lib.smb.util.ModuleUtils;
+import io.ballerina.lib.smb.util.SmbContentConverter;
+import io.ballerina.lib.smb.util.SmbUtil;
 import io.ballerina.runtime.api.Environment;
 import io.ballerina.runtime.api.Module;
 import io.ballerina.runtime.api.concurrent.StrandMetadata;
@@ -56,11 +61,6 @@ import io.ballerina.runtime.api.values.BError;
 import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BObject;
 import io.ballerina.runtime.api.values.BString;
-import io.ballerina.stdlib.smb.iterator.ByteIterator;
-import io.ballerina.stdlib.smb.iterator.CsvIterator;
-import io.ballerina.stdlib.smb.util.ModuleUtils;
-import io.ballerina.stdlib.smb.util.SmbContentConverter;
-import io.ballerina.stdlib.smb.util.SmbUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,20 +88,20 @@ import javax.security.auth.login.Configuration;
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
 
-import static io.ballerina.stdlib.smb.client.SmbClient.ACCESSED_AT;
-import static io.ballerina.stdlib.smb.client.SmbClient.CREATED_AT;
-import static io.ballerina.stdlib.smb.client.SmbClient.EXTENSION;
-import static io.ballerina.stdlib.smb.client.SmbClient.IS_DIRECTORY;
-import static io.ballerina.stdlib.smb.client.SmbClient.IS_EXECUTABLE;
-import static io.ballerina.stdlib.smb.client.SmbClient.IS_HIDDEN;
-import static io.ballerina.stdlib.smb.client.SmbClient.IS_WRITABLE;
-import static io.ballerina.stdlib.smb.client.SmbClient.MISSING_CREDENTIALS_FOR_AUTH_ERROR;
-import static io.ballerina.stdlib.smb.client.SmbClient.MODIFIED_AT;
-import static io.ballerina.stdlib.smb.client.SmbClient.NAME;
-import static io.ballerina.stdlib.smb.client.SmbClient.PATH;
-import static io.ballerina.stdlib.smb.client.SmbClient.SMB_ERROR;
-import static io.ballerina.stdlib.smb.client.SmbClient.URI;
-import static io.ballerina.stdlib.smb.client.SmbClient.WRITTEN_AT;
+import static io.ballerina.lib.smb.client.SmbClient.ACCESSED_AT;
+import static io.ballerina.lib.smb.client.SmbClient.CREATED_AT;
+import static io.ballerina.lib.smb.client.SmbClient.EXTENSION;
+import static io.ballerina.lib.smb.client.SmbClient.IS_DIRECTORY;
+import static io.ballerina.lib.smb.client.SmbClient.IS_EXECUTABLE;
+import static io.ballerina.lib.smb.client.SmbClient.IS_HIDDEN;
+import static io.ballerina.lib.smb.client.SmbClient.IS_WRITABLE;
+import static io.ballerina.lib.smb.client.SmbClient.MISSING_CREDENTIALS_FOR_AUTH_ERROR;
+import static io.ballerina.lib.smb.client.SmbClient.MODIFIED_AT;
+import static io.ballerina.lib.smb.client.SmbClient.NAME;
+import static io.ballerina.lib.smb.client.SmbClient.PATH;
+import static io.ballerina.lib.smb.client.SmbClient.SMB_ERROR;
+import static io.ballerina.lib.smb.client.SmbClient.URI;
+import static io.ballerina.lib.smb.client.SmbClient.WRITTEN_AT;
 
 /**
  * Helper class for SMB listener operations.

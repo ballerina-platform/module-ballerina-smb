@@ -16,7 +16,7 @@
  * under the License.
  */
 
-package io.ballerina.stdlib.smb.server;
+package io.ballerina.lib.smb.server;
 
 import io.ballerina.runtime.api.values.BObject;
 

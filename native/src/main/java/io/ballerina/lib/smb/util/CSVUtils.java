@@ -16,7 +16,7 @@
  * under the License.
  */
 
-package io.ballerina.stdlib.smb.util;
+package io.ballerina.lib.smb.util;
 
 import io.ballerina.runtime.api.values.BArray;
 import io.ballerina.runtime.api.values.BMap;

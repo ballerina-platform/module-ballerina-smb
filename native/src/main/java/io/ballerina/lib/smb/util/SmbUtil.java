@@ -16,7 +16,7 @@
  * under the License.
  */
 
-package io.ballerina.stdlib.smb.util;
+package io.ballerina.lib.smb.util;
 
 import io.ballerina.runtime.api.Module;
 import io.ballerina.runtime.api.creators.ErrorCreator;
@@ -24,7 +24,7 @@ import io.ballerina.runtime.api.utils.StringUtils;
 import io.ballerina.runtime.api.values.BError;
 import io.ballerina.runtime.api.values.BString;
 
-import static io.ballerina.stdlib.smb.util.ModuleUtils.getModule;
+import static io.ballerina.lib.smb.util.ModuleUtils.getModule;
 
 /**
  * Utils class for SMB client operations.

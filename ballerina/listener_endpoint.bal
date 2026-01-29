@@ -114,7 +114,7 @@ public isolated class Listener {
     #
     # + return - An `error` if failed to establish communication with the SMB server
     public isolated function poll() returns error? = @java:Method {
-        'class: "io.ballerina.stdlib.smb.server.SmbListenerHelper"
+        'class: "io.ballerina.lib.smb.server.SmbListenerHelper"
     } external;
 
     # Registers an SMB service with the listener.
@@ -126,22 +126,22 @@ public isolated class Listener {
     # + name - Optional name of the service
     # + return - An `error` if failed to establish communication with the SMB server
     public isolated function register(Service smbService, string? name) returns error? = @java:Method {
-        'class: "io.ballerina.stdlib.smb.server.SmbListenerHelper"
+        'class: "io.ballerina.lib.smb.server.SmbListenerHelper"
     } external;
 }
 
 isolated function initListener(Listener listenerEndpoint, ListenerConfiguration config)
         returns Error? = @java:Method {
     name: "init",
-    'class: "io.ballerina.stdlib.smb.server.SmbListenerHelper"
+    'class: "io.ballerina.lib.smb.server.SmbListenerHelper"
 } external;
 
 isolated function deregister(Listener listenerEndpoint, Service smbService) returns Error? = @java:Method {
-    'class: "io.ballerina.stdlib.smb.server.SmbListenerHelper"
+    'class: "io.ballerina.lib.smb.server.SmbListenerHelper"
 } external;
 
 isolated function cleanup(Listener listenerEndpoint) returns Error? = @java:Method {
-    'class: "io.ballerina.stdlib.smb.server.SmbListenerHelper"
+    'class: "io.ballerina.lib.smb.server.SmbListenerHelper"
 } external;
 
 class Job {

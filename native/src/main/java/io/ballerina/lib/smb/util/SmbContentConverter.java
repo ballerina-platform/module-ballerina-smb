@@ -16,7 +16,7 @@
  * under the License.
  */
 
-package io.ballerina.stdlib.smb.util;
+package io.ballerina.lib.smb.util;
 
 import io.ballerina.lib.data.ModuleUtils;
 import io.ballerina.lib.data.xmldata.xml.Native;
@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 
-import static io.ballerina.stdlib.smb.client.SmbClient.SMB_ERROR;
+import static io.ballerina.lib.smb.client.SmbClient.SMB_ERROR;
 
 /**
  * Utility class for converting file content to various Ballerina types using data binding modules.
