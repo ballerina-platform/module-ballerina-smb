@@ -149,7 +149,7 @@ task startSmbDockerServer() {
     doLast {
         if (!Os.isFamily(Os.FAMILY_WINDOWS)) {
             exec {
-                workingDir = "${project.rootDir}"
+                workingDir = "${project.projectDir}/tests/resources"
                 commandLine 'sh', '-c', 'docker compose up -d --wait'
             }
             println "SMB Docker server started successfully"
@@ -161,7 +161,7 @@ task stopSmbDockerServer() {
     doLast {
         if (!Os.isFamily(Os.FAMILY_WINDOWS)) {
             exec {
-                workingDir = "${project.rootDir}"
+                workingDir = "${project.projectDir}/tests/resources"
                 commandLine 'sh', '-c', 'docker compose down -v'
             }
             println "SMB Docker server stopped successfully"
