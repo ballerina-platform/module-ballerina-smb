@@ -230,14 +230,14 @@ function testSmbListenerOnError() returns error? {
     test:assertEquals(stopResult, ());
 }
 
-type CsvRecord record {|
+type ListenerCsvRecord record {|
     string id;
     string name;
     string email;
 |};
 
 int csvRecordArrayCounter = 0;
-CsvRecord[]? capturedCsvRecordArray = ();
+ListenerCsvRecord[]? capturedCsvRecordArray = ();
 string? capturedCsvRecordArrayFileName = ();
 
 int csvStringStreamCounter = 0;
@@ -319,7 +319,7 @@ Service contentHandlerService = service object {
 };
 
 Service csvRecordArrayService = service object {
-    remote function onFileCsv(CsvRecord[] content, FileInfo fileInfo) returns error? {
+    remote function onFileCsv(ListenerCsvRecord[] content, FileInfo fileInfo) returns error? {
         csvRecordArrayCounter += 1;
         capturedCsvRecordArray = content;
         capturedCsvRecordArrayFileName = fileInfo.name;
@@ -351,11 +351,11 @@ Service csvStringStreamService = service object {
 };
 
 Service csvRecordStreamService = service object {
-    remote function onFileCsv(stream<CsvRecord, error?> content, FileInfo fileInfo) returns error? {
+    remote function onFileCsv(stream<ListenerCsvRecord, error?> content, FileInfo fileInfo) returns error? {
         csvRecordStreamCounter += 1;
         capturedCsvRecordStreamFileName = fileInfo.name;
         int recordCount = 0;
-        error? result = content.forEach(function(CsvRecord rec) {
+        error? result = content.forEach(function(ListenerCsvRecord rec) {
             recordCount += 1;
         });
         csvRecordStreamRowCount = recordCount;
@@ -616,8 +616,8 @@ function testOnFileCsvRecordArrayHandler() returns error? {
 
     check csvRecordListener.immediateStop();
     test:assertTrue(csvRecordArrayCounter >= 1, "onFileCsv with record[] should be triggered at least once");
-    CsvRecord[]? recordData = capturedCsvRecordArray;
-    if recordData is CsvRecord[] {
+    ListenerCsvRecord[]? recordData = capturedCsvRecordArray;
+    if recordData is ListenerCsvRecord[] {
         test:assertTrue(recordData.length() >= 2, "CSV should have at least 2 records (excluding header)");
         test:assertTrue(recordData[0].id.length() > 0, "First record id should not be empty");
         test:assertTrue(recordData[0].name.length() > 0, "First record name should not be empty");
