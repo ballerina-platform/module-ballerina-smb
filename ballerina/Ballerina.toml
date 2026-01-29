@@ -7,7 +7,7 @@ keywords = ["smb", "file", "network shares"]
 repository = "https://github.com/ballerina-platform/module-ballerina-smb"
 # icon = "icon.png"
 license = ["Apache-2.0"]
-distribution = "2201.13.0"
+distribution = "2201.12.0"
 
 [platform.java21]
 graalvmCompatible = true
@@ -54,11 +54,11 @@ artifactId = "commons-io"
 version = "2.18.0"
 path = "./lib/commons-io-2.18.0.jar"
 
-[[platform.java21.dependency]]
-groupId = "org.apache.commons"
-artifactId = "commons-lang3"
-version = "3.18.0"
-path = "./lib/commons-lang3-3.18.0.jar"
+# [[platform.java21.dependency]]
+# groupId = "org.apache.commons"
+# artifactId = "commons-lang3"
+# version = "3.18.0"
+# path = "./lib/commons-lang3-3.18.0.jar"
 
 [[platform.java21.dependency]]
 groupId = "org.apache.commons"
@@ -87,5 +87,5 @@ path = "./lib/data.xmldata-native-1.5.2.jar"
 [[platform.java21.dependency]]
 groupId = "io.ballerina.lib"
 artifactId = "data.csv-native"
-version = "0.9.0-20251209-183500-7b18d54"
-path = "./lib/data.csv-native-0.9.0-20251209-183500-7b18d54.jar"
+version = "0.9.0"
+path = "./lib/data.csv-native-0.9.0.jar"
