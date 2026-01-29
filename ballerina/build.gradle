@@ -58,10 +58,10 @@ dependencies {
     externalJars(group: 'com.hierynomus', name: 'smbj', version: "${smbjVersion}") {
         transitive = false
     }
-    externalJars(group: 'com.hierynomus', name: 'asn-one', version: '0.6.0') {
+    externalJars(group: 'com.hierynomus', name: 'asn-one', version: "${asnOneVersion}") {
         transitive = false
     }
-    externalJars(group: 'net.engio', name: 'mbassador', version: '1.3.2') {
+    externalJars(group: 'net.engio', name: 'mbassador', version: "${mbassadorVersion}") {
         transitive = false
     }
     externalJars(group: 'org.bouncycastle', name: 'bcprov-jdk15on', version: "${bouncycastleVersion}") {
@@ -112,6 +112,10 @@ task updateTomlFiles {
         newConfig = newConfig.replace("@data.jsondata.version@", stdlibDataJsonDataVersion)
         newConfig = newConfig.replace("@data.xmldata.version@", stdlibDataXmlDataVersion)
         newConfig = newConfig.replace("@data.csv.version@", stdlibDataCsvVersion)
+        newConfig = newConfig.replace("@commons.vfs2.version@", commonsVfs2Version)
+        newConfig = newConfig.replace("@slf4j.version@", slf4jVersion)
+        newConfig = newConfig.replace("@mbassador.version@", mbassadorVersion)
+        newConfig = newConfig.replace("@asn.one.version@", asnOneVersion)
 
         ballerinaTomlFile.text = newConfig
     }
