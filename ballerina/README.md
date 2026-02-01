@@ -455,3 +455,13 @@ smb:ClientConfiguration smbConfig = {
     connectTimeout: 60.0
 };
 ```
+
+### Examples
+
+The `ballerina/smb` connector provides practical examples illustrating usage in various scenarios.
+
+1. [Basic File Operations](examples/basic-file-operations) – Connects to an SMB share (Kerberos-enabled), lists the root directory, writes a test file, verifies it exists, and reads it back.
+
+2. [Manage Sales Reports](examples/sales-report) – Listens for JSON sales reports on an SMB share, flattens nested data into row records, appends them to a CSV data file, and moves the processed file to a designated folder.
+
+3. [Manage time sheets](examples/timesheets) – Validates contractor timesheet CSVs from an SMB share, moves valid files to a processed location and writes cleaned copies, or quarantines invalid files with detailed error logs.
