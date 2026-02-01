@@ -91,7 +91,7 @@ public isolated client class Client {
     # + content - JSON content to write
     # + option - File write option (OVERWRITE or APPEND)
     # + return - `()` or else an `smb:Error` if the operation fails
-    remote isolated function putJson(string path, json|record {|json...;|} content, FileWriteOption option = OVERWRITE)
+    remote isolated function putJson(string path, json content, FileWriteOption option = OVERWRITE)
             returns Error? {
         return self->putText(path, content.toString(), option);
     }
