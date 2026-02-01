@@ -483,9 +483,9 @@ function testOnFileJsonHandler() returns error? {
     runtime:sleep(5);
     check jsonListener.immediateStop();
 
-    test:assertTrue(jsonFileCounter >= 1, "onFileJson should be triggered at least once");
-    test:assertTrue(capturedJsonContent is json, "JSON content should be captured");
-    test:assertEquals(capturedJsonFileName, "user_data.json", "File name should match");
+    test:assertTrue(jsonFileCounter >= 1);
+    test:assertTrue(capturedJsonContent !is ());
+    test:assertEquals(capturedJsonFileName, "user_data.json");
 }
 
 @test:Config {
@@ -815,7 +815,7 @@ function testOnFileByteStreamHandler() returns error? {
     test:assertTrue(binaryStreamChunkCount == 1, "Stream should have processed exactly 1 chunk");
     test:assertTrue(binaryStreamTotalBytes >= 20000, "Stream should have processed all bytes");
     test:assertEquals(capturedBinaryStreamFileName, "large_binary.dat", "File name should match");
-    error? result = smbClient->rmdir("content_tests");
+    _ = check smbClient->rmdir("content_tests");
 }
 
 @test:Config {
@@ -869,6 +869,5 @@ function testOnFileXmlRecordHandler() returns error? {
         test:assertFail("XML record content should be captured");
     }
     test:assertEquals(capturedXmlRecordFileName, "db_config.xml", "File name should match");
-
-    error? cleanupResult = smbClient->rmdir("xml_record_tests");
+    _ = check smbClient->rmdir("xml_record_tests");
 }
