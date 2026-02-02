@@ -1,6 +1,6 @@
-# Ballerina Smb connector
+# Ballerina SMB Library
 
-[![Build](https://github.com/ballerina-platform/module-ballerina-smb/actions/workflows/build-timestamped-master.yml.yml/badge.svg)](https://github.com/ballerina-platform/module-ballerina-smb/actions/workflows/build-timestamped-master.yml.yml)
+[![Build](https://github.com/ballerina-platform/module-ballerina-smb/actions/workflows/build-timestamped-master.yml/badge.svg)](https://github.com/ballerina-platform/module-ballerina-smb/actions/workflows/build-timestamped-master.yml)
 [![GitHub Last Commit](https://img.shields.io/github/last-commit/ballerina-platform/module-ballerina-smb.svg)](https://github.com/ballerina-platform/module-ballerina-smb/commits/master)
 [![GitHub Issues](https://img.shields.io/github/issues/ballerina-platform/ballerina-library/module/smb.svg?label=Open%20Issues)](https://github.com/ballerina-platform/ballerina-library/labels/module%smb)
 
