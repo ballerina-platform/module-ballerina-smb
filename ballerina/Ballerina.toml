@@ -70,7 +70,7 @@ path = "./lib/commons-vfs2-2.10.0.jar"
 groupId = "io.ballerina.lib"
 artifactId = "smb-native"
 version = "1.0.0"
-path = "../native/build/libs/smb-native-1.0.0-SNAPSHOT.jar"
+path = "../native/build/libs/smb-native-1.0.0.jar"
 
 [[platform.java21.dependency]]
 groupId = "io.ballerina.lib"
