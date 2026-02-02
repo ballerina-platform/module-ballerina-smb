@@ -70,15 +70,6 @@ final smb:Client smbClient = check new ({
     }
 });
 
-function init() returns error? {
-    check ensureDirectoryExists("/timesheets");
-    check ensureDirectoryExists("/timesheets/incoming");
-    check ensureDirectoryExists("/timesheets/processed");
-    check ensureDirectoryExists("/timesheets/quarantine");
-    check ensureDirectoryExists("/timesheets/validated");
-    log:printInfo("Initialized timesheet directories on SMB share");
-}
-
 @smb:ServiceConfig {
     path: "/timesheets/incoming"
 }

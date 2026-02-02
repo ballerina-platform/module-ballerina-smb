@@ -22,7 +22,7 @@ configurable int smbPort = 445;
 configurable string smbShare = ?;
 configurable string smbUsername = ?;
 configurable string smbPassword = ?;
-configurable string smbDomain = "WORKGROUP";
+configurable string smbDomain = ?;
 
 type SaleItem record {|
     string itemId;
@@ -72,14 +72,6 @@ final smb:Client smbClient = check new ({
         }
     }
 });
-
-function init() returns error? {
-    check ensureDirectoryExists("/sales");
-    check ensureDirectoryExists("/sales/new");
-    check ensureDirectoryExists("/sales/processed");
-    check ensureDirectoryExists("/sales/data");
-    log:printInfo("Initialized sales directories on SMB share");
-}
 
 @smb:ServiceConfig {
     path: "/sales/new"
