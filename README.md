@@ -398,6 +398,25 @@ service on remoteServer {
 }
 ```
 
+#### SMB Caller
+
+All content handler methods (`onFileText`, `onFileJson`, `onFileXml`, `onFileCsv`, `onFile`) support an optional `smb:Caller` parameter. The `Caller` object provides access to the SMB client, allowing you to perform operations on the SMB share from within the handler (e.g., writing response files, moving processed files, or reading related files).
+
+```ballerina
+service on remoteServer {
+    remote function onFileText(string content, smb:Caller caller, smb:FileInfo fileInfo) returns error? {
+        log:printInfo("Processing text file: " + fileInfo.path);
+        
+        // Process the content and write a response
+        string response = "Processed: " + content;
+        check caller->putText("/processed/" + fileInfo.name, response);
+        
+        // Move the original file to archive
+        check caller->rename(fileInfo.path, "/archive/" + fileInfo.name);
+    }
+}
+```
+
 The SMB listener automatically routes files to the appropriate content handler based on file extension: `.txt` -> `onFileText()`, `.json` -> `onFileJson()`, `.xml` -> `onFileXml()`, `.csv` -> `onFileCsv()`, and other extensions -> `onFile()` (fallback handler). You can override the default routing using the `@smb:FunctionConfig` annotation to specify a custom file name pattern for each handler method.
 
 ### Advanced configuration options
