@@ -47,10 +47,12 @@ rootProject.name = 'smb'
 include ':checkstyle'
 include ':smb-native'
 include ':smb-ballerina'
+include ':smb-examples'
 
 project(':checkstyle').projectDir = file("build-config${File.separator}checkstyle")
 project(':smb-native').projectDir = file('native')
 project(':smb-ballerina').projectDir = file('ballerina')
+project(':smb-examples').projectDir = file('examples')
 
 gradleEnterprise {
     buildScan {

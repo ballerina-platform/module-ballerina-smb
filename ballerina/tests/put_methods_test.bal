@@ -44,7 +44,7 @@ type Book record {|
 
 @test:BeforeSuite
 function setupTestDirectory() returns error? {
-    Error? mkdirResult = testClient->mkdir("test");
+    _ = check testClient->mkdir("test");
 }
 
 @test:Config {

@@ -1,7 +1,7 @@
 [package]
 org = "ballerina"
 name = "smb"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Ballerina"]
 keywords = ["smb", "file", "network shares"]
 repository = "https://github.com/ballerina-platform/module-ballerina-smb"
@@ -26,9 +26,9 @@ path = "./lib/asn-one-0.6.0.jar"
 
 [[platform.java21.dependency]]
 groupId = "org.bouncycastle"
-artifactId = "bcprov-jdk15on"
-version = "1.70"
-path = "./lib/bcprov-jdk15on-1.70.jar"
+artifactId = "bcprov-jdk18on"
+version = "1.78"
+path = "./lib/bcprov-jdk18on-1.78.jar"
 
 [[platform.java21.dependency]]
 groupId = "eu.agno3.jcifs"
@@ -63,14 +63,14 @@ path = "./lib/commons-io-2.18.0.jar"
 [[platform.java21.dependency]]
 groupId = "org.apache.commons"
 artifactId = "commons-vfs2"
-version = "2.9.0"
-path = "./lib/commons-vfs2-2.9.0.jar"
+version = "2.10.0"
+path = "./lib/commons-vfs2-2.10.0.jar"
 
 [[platform.java21.dependency]]
 groupId = "io.ballerina.lib"
 artifactId = "smb-native"
-version = "0.1.0"
-path = "../native/build/libs/smb-native-0.1.0-SNAPSHOT.jar"
+version = "1.0.0"
+path = "../native/build/libs/smb-native-1.0.0-SNAPSHOT.jar"
 
 [[platform.java21.dependency]]
 groupId = "io.ballerina.lib"

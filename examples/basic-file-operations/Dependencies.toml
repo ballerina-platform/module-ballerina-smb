@@ -9,6 +9,19 @@ distribution-version = "2201.12.0"
 
 [[package]]
 org = "ballerina"
+name = "basic_file_operations"
+version = "0.1.0"
+dependencies = [
+	{org = "ballerina", name = "io"},
+	{org = "ballerina", name = "smb"},
+	{org = "ballerinai", name = "observe"}
+]
+modules = [
+	{org = "ballerina", packageName = "basic_file_operations", moduleName = "basic_file_operations"}
+]
+
+[[package]]
+org = "ballerina"
 name = "crypto"
 version = "2.10.1"
 dependencies = [
@@ -24,9 +37,6 @@ dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "log"}
 ]
-modules = [
-	{org = "ballerina", packageName = "data.csv", moduleName = "data.csv"}
-]
 
 [[package]]
 org = "ballerina"
@@ -36,9 +46,6 @@ dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "lang.object"}
 ]
-modules = [
-	{org = "ballerina", packageName = "data.jsondata", moduleName = "data.jsondata"}
-]
 
 [[package]]
 org = "ballerina"
@@ -47,9 +54,6 @@ version = "1.5.3"
 dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "lang.object"}
-]
-modules = [
-	{org = "ballerina", packageName = "data.xmldata", moduleName = "data.xmldata"}
 ]
 
 [[package]]
@@ -68,9 +72,6 @@ modules = [
 org = "ballerina"
 name = "jballerina.java"
 version = "0.0.0"
-modules = [
-	{org = "ballerina", packageName = "jballerina.java", moduleName = "jballerina.java"}
-]
 
 [[package]]
 org = "ballerina"
@@ -79,25 +80,6 @@ version = "0.0.0"
 dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "lang.object"}
-]
-
-[[package]]
-org = "ballerina"
-name = "lang.array"
-version = "0.0.0"
-scope = "testOnly"
-dependencies = [
-	{org = "ballerina", name = "jballerina.java"},
-	{org = "ballerina", name = "lang.__internal"}
-]
-
-[[package]]
-org = "ballerina"
-name = "lang.error"
-version = "0.0.0"
-scope = "testOnly"
-dependencies = [
-	{org = "ballerina", name = "jballerina.java"}
 ]
 
 [[package]]
@@ -117,18 +99,6 @@ version = "0.0.0"
 
 [[package]]
 org = "ballerina"
-name = "lang.runtime"
-version = "0.0.0"
-scope = "testOnly"
-dependencies = [
-	{org = "ballerina", name = "jballerina.java"}
-]
-modules = [
-	{org = "ballerina", packageName = "lang.runtime", moduleName = "lang.runtime"}
-]
-
-[[package]]
-org = "ballerina"
 name = "lang.value"
 version = "0.0.0"
 dependencies = [
@@ -144,9 +114,6 @@ dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "lang.value"},
 	{org = "ballerina", name = "observe"}
-]
-modules = [
-	{org = "ballerina", packageName = "log", moduleName = "log"}
 ]
 
 [[package]]
@@ -167,10 +134,8 @@ dependencies = [
 	{org = "ballerina", name = "data.xmldata"},
 	{org = "ballerina", name = "io"},
 	{org = "ballerina", name = "jballerina.java"},
-	{org = "ballerina", name = "lang.runtime"},
 	{org = "ballerina", name = "log"},
 	{org = "ballerina", name = "task"},
-	{org = "ballerina", name = "test"},
 	{org = "ballerina", name = "time"}
 ]
 modules = [
@@ -186,23 +151,6 @@ dependencies = [
 	{org = "ballerina", name = "time"},
 	{org = "ballerina", name = "uuid"}
 ]
-modules = [
-	{org = "ballerina", packageName = "task", moduleName = "task"}
-]
-
-[[package]]
-org = "ballerina"
-name = "test"
-version = "0.0.0"
-scope = "testOnly"
-dependencies = [
-	{org = "ballerina", name = "jballerina.java"},
-	{org = "ballerina", name = "lang.array"},
-	{org = "ballerina", name = "lang.error"}
-]
-modules = [
-	{org = "ballerina", packageName = "test", moduleName = "test"}
-]
 
 [[package]]
 org = "ballerina"
@@ -210,9 +158,6 @@ name = "time"
 version = "2.8.0"
 dependencies = [
 	{org = "ballerina", name = "jballerina.java"}
-]
-modules = [
-	{org = "ballerina", packageName = "time", moduleName = "time"}
 ]
 
 [[package]]
@@ -224,5 +169,17 @@ dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "lang.int"},
 	{org = "ballerina", name = "time"}
+]
+
+[[package]]
+org = "ballerinai"
+name = "observe"
+version = "0.0.0"
+dependencies = [
+	{org = "ballerina", name = "jballerina.java"},
+	{org = "ballerina", name = "observe"}
+]
+modules = [
+	{org = "ballerinai", packageName = "observe", moduleName = "observe"}
 ]
 

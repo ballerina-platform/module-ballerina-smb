@@ -1,6 +1,6 @@
-# Ballerina Smb connector
+# Ballerina SMB Library
 
-[![Build](https://github.com/ballerina-platform/module-ballerina-smb/actions/workflows/ci.yml/badge.svg)](https://github.com/ballerina-platform/module-ballerina-smb/actions/workflows/ci.yml)
+[![Build](https://github.com/ballerina-platform/module-ballerina-smb/actions/workflows/build-timestamped-master.yml/badge.svg)](https://github.com/ballerina-platform/module-ballerina-smb/actions/workflows/build-timestamped-master.yml)
 [![GitHub Last Commit](https://img.shields.io/github/last-commit/ballerina-platform/module-ballerina-smb.svg)](https://github.com/ballerina-platform/module-ballerina-smb/commits/master)
 [![GitHub Issues](https://img.shields.io/github/issues/ballerina-platform/ballerina-library/module/smb.svg?label=Open%20Issues)](https://github.com/ballerina-platform/ballerina-library/labels/module%smb)
 
@@ -398,6 +398,25 @@ service on remoteServer {
 }
 ```
 
+#### SMB Caller
+
+All content handler methods (`onFileText`, `onFileJson`, `onFileXml`, `onFileCsv`, `onFile`) support an optional `smb:Caller` parameter. The `Caller` object provides access to the SMB client, allowing you to perform operations on the SMB share from within the handler (e.g., writing response files, moving processed files, or reading related files).
+
+```ballerina
+service on remoteServer {
+    remote function onFileText(string content, smb:Caller caller, smb:FileInfo fileInfo) returns error? {
+        log:printInfo("Processing text file: " + fileInfo.path);
+        
+        // Process the content and write a response
+        string response = "Processed: " + content;
+        check caller->putText("/processed/" + fileInfo.name, response);
+        
+        // Move the original file to archive
+        check caller->rename(fileInfo.path, "/archive/" + fileInfo.name);
+    }
+}
+```
+
 The SMB listener automatically routes files to the appropriate content handler based on file extension: `.txt` -> `onFileText()`, `.json` -> `onFileJson()`, `.xml` -> `onFileXml()`, `.csv` -> `onFileCsv()`, and other extensions -> `onFile()` (fallback handler). You can override the default routing using the `@smb:FunctionConfig` annotation to specify a custom file name pattern for each handler method.
 
 ### Advanced configuration options
@@ -461,6 +480,16 @@ smb:ClientConfiguration smbConfig = {
     connectTimeout: 60.0
 };
 ```
+
+### Examples
+
+The `ballerina/smb` connector provides practical examples illustrating usage in various scenarios.
+
+1. [Basic File Operations](https://github.com/ballerina-platform/module-ballerina-smb/tree/main/examples/basic-file-operations) – Connects to an SMB share (Kerberos-enabled), lists the root directory, writes a test file, verifies it exists, and reads it back.
+
+2. [Manage Sales Reports](https://github.com/ballerina-platform/module-ballerina-smb/tree/main/examples/sales-report) – Listens for JSON sales reports on an SMB share, flattens nested data into row records, appends them to a CSV data file, and moves the processed file to a designated folder.
+
+3. [Manage time sheets](https://github.com/ballerina-platform/module-ballerina-smb/tree/main/examples/timesheets) – Validates contractor timesheet CSVs from an SMB share, moves valid files to a processed location and writes cleaned copies, or quarantines invalid files with detailed error logs.
 
 ## Build from the source
 
