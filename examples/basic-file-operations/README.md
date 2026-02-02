@@ -1,6 +1,6 @@
 # Basic file operations via SMB server
 
-This example demonstrates connecting to SMB server with Kerberos authentication and perform operations like listing, writing, and reading files on the server.
+This example demonstrates connecting to an SMB server with Kerberos authentication and performing operations like listing, writing, and reading files on the server.
 
 ## Configure
 
@@ -9,9 +9,8 @@ Update the placeholders in `Config.toml`.
 ```toml
 # Replace with your values
 kerberosHost = "<smb-hostname-or-ip>"
-kerberosUser = "<username>"
-kerberosPassword = "<password>"
-kerberosDomain = "<domain>"
+kerberosPrincipal = "<username@REALM>"
+kerberosKeytab = "<path/to/keytab-file>"
 kerberosShare = "<share-name>"
 kerberosConfigFile = "path/to/krb5.conf"
 ```

@@ -15,18 +15,17 @@
 // under the License.
 
 import ballerina/log;
-import nuvindu/smb;
+import ballerina/smb;
 import ballerina/time;
 
 configurable string smbHost = ?;
-configurable int smbPort = 445;
+configurable int smbPort = ?;
 configurable string smbShare = ?;
 configurable string smbUsername = ?;
 configurable string smbPassword = ?;
-configurable string smbDomain = "WORKGROUP";
+configurable string smbDomain = ?;
 
 configurable int expectedRecordCount = 5;
-configurable float invalidThreshold = 0.05;
 
 final string[] validContractorIds = ["CTR-001", "CTR-002", "CTR-003", "CTR-004", "CTR-005"];
 
@@ -163,7 +162,7 @@ function validateTimesheetData(TimesheetRecord[] content) returns ValidationResu
 
 function quarantineFile(smb:Caller caller, smb:FileInfo fileInfo, string reason) returns error? {
     time:Utc now = time:utcNow();
-    string timestamp = now.toString();
+    string timestamp = now[0].toString();
     string quarantinePath = string `/timesheets/quarantine/${reason}_${timestamp}_${fileInfo.name}`;
     check caller->move(fileInfo.path, quarantinePath);
     log:printWarn(string `File quarantined: ${fileInfo.name} (reason: ${reason})`);
@@ -171,7 +170,10 @@ function quarantineFile(smb:Caller caller, smb:FileInfo fileInfo, string reason)
 
 function ensureDirectoryExists(string path) returns error? {
     boolean|smb:Error exists = smbClient->exists(path);
-    if exists is smb:Error || !exists {
+    if exists is smb:Error {
+        return exists;
+    }
+    if !exists {
         check smbClient->mkdir(path);
     }
 }

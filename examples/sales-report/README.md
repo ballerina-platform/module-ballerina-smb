@@ -1,6 +1,15 @@
 ## Sales report via SMB server
 
-This example processes JSON sales reports placed on an SMB share. It will listens for JSON sales reports on an SMB share, flattens nested data into row records, appends them to a CSV data file, and moves the processed file to a designated folder.
+This example processes JSON sales reports placed on an SMB share. It listens for JSON sales reports on an SMB share, flattens nested data into row records, appends them to a CSV data file, and moves the processed file to a designated folder.
+
+### Prerequisites
+
+You will need to have the following directories added to the SMB share first.
+
+- `/sales` - Root directory for sales operations
+- `/sales/new` - Directory monitored for incoming JSON sales reports
+- `/sales/processed` - Directory for successfully processed sales reports
+- `/sales/data` - Directory where sales data is persisted
 
 ### Configure
 

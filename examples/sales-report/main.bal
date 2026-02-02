@@ -85,7 +85,7 @@ function init() returns error? {
     path: "/sales/new"
 }
 service "salesReportProcessor" on smbListener {
-    remote function onFileJson(SalesReport content, smb:FileInfo fileInfo) returns error? {
+    remote function onFileJson(SalesReport content, smb:Caller caller, smb:FileInfo fileInfo) returns error? {
         log:printInfo(string `Processing sales report: ${fileInfo.name}`);
         log:printInfo(string `Store: ${content.storeId}, Location: ${content.storeLocation}, Date: ${content.saleDate}`);
 
@@ -101,16 +101,13 @@ service "salesReportProcessor" on smbListener {
             };
 
         // Persist sales records to CSV file
-        string csvPath = "/sales/data/sales_data.csv";
+        string csvPath = "/sales/data/sales_data.json";
         check ensureDirectoryExists("/sales/data");
-        foreach SalesRecord sales in salesRecords {
-            check smbClient->putJson(csvPath, sales, smb:APPEND);
-            log:printInfo(string `Added ${salesRecords.length()} sales records to ${csvPath}`);
-            
-        }
+        check caller->putJson(csvPath, salesRecords, smb:APPEND);
+        log:printInfo(string `Added ${salesRecords.length()} sales records to ${csvPath}`);
         check ensureDirectoryExists("/sales/processed");
         string destinationPath = string `/sales/processed/${fileInfo.name}`;
-        check smbClient->move(fileInfo.path, destinationPath);
+        check caller->move(fileInfo.path, destinationPath);
         log:printInfo(string `File moved to processed: ${fileInfo.name}`);
     }
 
@@ -121,7 +118,10 @@ service "salesReportProcessor" on smbListener {
 
 function ensureDirectoryExists(string path) returns error? {
     boolean|smb:Error exists = smbClient->exists(path);
-    if exists is smb:Error || !exists {
+    if exists is smb:Error {
+        return exists;
+    }
+    if !exists {
         check smbClient->mkdir(path);
     }
 }
