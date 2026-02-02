@@ -1,0 +1,63 @@
+// Copyright (c) 2026, WSO2 LLC. (http://www.wso2.com).
+//
+// WSO2 LLC. licenses this file to you under the Apache License,
+// Version 2.0 (the "License"); you may not use this file except
+// in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+import ballerina/jballerina.java;
+
+# Stream for reading CSV content row by row from an SMB share.
+# This stream provides CSV rows as string arrays.
+public class ContentCsvStringArrayStream {
+
+    private boolean isClosed = false;
+    private Error? err;
+
+    public isolated function init(Error? err = ()) {
+        self.err = err;
+    }
+
+    # Reads and return the next CSV record as `string[]`.
+    #
+    # + return - A record containing a string array when the stream is available,
+    #            `()` if the stream has reached the end or else an `error`
+    public isolated function next() returns record {|string[] value;|}|error? {
+        return externGetContentCsvStreamEntry(self);
+    }
+
+    # Closes the stream. The primary usage of this function is to close the stream without reaching the end.
+    # If the stream reaches the end, the `contentCsvStringArrayStream.next` will automatically close the stream.
+    #
+    # + return - Returns `()` when the closing was successful or an `error`
+    public isolated function close() returns error? {
+        if !self.isClosed {
+            var closeResult = externCloseContentCsvStream(self);
+            if closeResult is () {
+                self.isClosed = true;
+            }
+            return closeResult;
+        }
+        return ();
+    }
+}
+
+isolated function externGetContentCsvStreamEntry(ContentCsvStringArrayStream iterator)
+        returns record {|string[] value;|}|error? = @java:Method {
+    'class: "io.ballerina.lib.smb.iterator.CsvIterator",
+    name: "next"
+} external;
+
+isolated function externCloseContentCsvStream(ContentCsvStringArrayStream iterator) returns error? = @java:Method {
+    'class: "io.ballerina.lib.smb.iterator.CsvIterator",
+    name: "close"
+} external;

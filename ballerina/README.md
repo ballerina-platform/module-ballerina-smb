@@ -8,7 +8,7 @@ The module supports SMB protocol versions `2.0.2` through `3.1.1`, with features
 
 The `smb:Client` connects to an SMB server and performs various operations on files and directories. It supports the following operations: `get`, `delete`, `put`, `patch`, `mkdir`, `rmdir`, `isDirectory`, `rename`, `move`, `copy`, `size`, `exists`, and `list`. The client also provides typed data operations for reading and writing files as text, JSON, XML, CSV, and binary data, with streaming support for handling large files efficiently.
 
-An SMB client is defined using the `host` and `share` parameters and optionally, the `port` and `auth`. Authentication can be configured using the `auth` parameter for NTLM credentials or Kerberos authentication.
+An SMB client is defined using the `host` and `share` parameters and optionally, the `port` and `auth`. Authentication configuration can be configured using the `auth` parameter for NTLM credentials or Kerberos authentication.
 
 #### Create a client
 
@@ -28,6 +28,7 @@ smb:ClientConfiguration smbConfig = {
     }
 };
 
+// Create the SMB client.
 smb:Client|smb:Error smbClient = new(smbConfig);
 ```
 
@@ -42,6 +43,7 @@ smb:ClientConfiguration smbConfig = {
     auth: {
         kerberosConfig: {
             principal: "user@REALM.COM",
+            realm: "REALM.COM",
             keytab: "/path/to/user.keytab",
             configFile: "/path/to/krb5.conf"
         }
@@ -156,8 +158,10 @@ string fileContent = check smbClient->getText("<The file path>");
 **Read as JSON or typed record:**
 
 ```ballerina
+// Read as JSON
 json jsonData = check smbClient->getJson("<The file path>");
 
+// Read as a specific record type
 type User record {
     string name;
     int age;
@@ -244,21 +248,6 @@ The following code lists files and directories in a remote SMB share.
 ```ballerina
 smb:FileInfo[]|smb:Error listResponse = smbClient->list("<The directory path>");
 ```
-
-### SMB Caller
-
-The `smb:Caller` provides a convenience wrapper for interacting with SMB servers from within file handlers. It offers the same API as the `smb:Client` but is designed specifically for use within listener service methods. The caller is passed as an optional parameter to handler methods.
-
-```ballerina
-service on remoteServer {
-    remote function onFileJson(json content, smb:FileInfo fileInfo, smb:Caller caller) returns error? {
-        check caller->putJson("/processed/" + fileInfo.name, content);
-        check caller->move(fileInfo.path, "/archive/" + fileInfo.name);
-    }
-}
-```
-
-The caller supports all client operations including `putBytes`, `putText`, `putJson`, `putXml`, `putCsv`, `getBytes`, `getText`, `getJson`, `getXml`, `getCsv`, `getBytesAsStream`, `getCsvAsStream`, `list`, `mkdir`, `rmdir`, `rename`, `move`, `copy`, `exists`, `size`, `isDirectory`, `delete`, and `patch`.
 
 ### SMB listener
 
@@ -405,78 +394,6 @@ service on remoteServer {
 
 The SMB listener automatically routes files to the appropriate content handler based on file extension: `.txt` -> `onFileText()`, `.json` -> `onFileJson()`, `.xml` -> `onFileXml()`, `.csv` -> `onFileCsv()`, and other extensions -> `onFile()` (fallback handler). You can override the default routing using the `@smb:FunctionConfig` annotation to specify a custom file name pattern for each handler method.
 
-#### Service configuration
-
-Use the `@smb:ServiceConfig` annotation to specify a custom directory path within the SMB share that the service should monitor. If not specified, the service name is used as the path.
-
-```ballerina
-@smb:ServiceConfig {
-    path: "/data/incoming"
-}
-service on remoteServer {
-    remote function onFileJson(json content, smb:FileInfo fileInfo) returns error? {
-        log:printInfo("File received in /data/incoming: " + fileInfo.name);
-    }
-}
-```
-
-#### Custom file name patterns
-
-Use the `@smb:FunctionConfig` annotation to override the default extension-based routing and specify custom file name patterns for handler methods.
-
-```ballerina
-service on remoteServer {
-    // Handle only files matching the pattern "report_*.json"
-    @smb:FunctionConfig {
-        fileNamePattern: "report_(.*).json"
-    }
-    remote function onFileJson(json content, smb:FileInfo fileInfo) returns error? {
-        log:printInfo("Report file: " + fileInfo.name);
-    }
-
-    // Handle log files with custom pattern
-    @smb:FunctionConfig {
-        fileNamePattern: "(.*).log"
-    }
-    remote function onFileText(string content, smb:FileInfo fileInfo) returns error? {
-        log:printInfo("Log file content: " + content);
-    }
-}
-```
-
-#### Handle file change events
-
-Use the `onFileChange` handler to receive generic file system events with information about added and deleted files.
-
-```ballerina
-service on remoteServer {
-    remote function onFileChange(smb:WatchEvent event) returns error? {
-        foreach smb:FileInfo file in event.addedFiles {
-            log:printInfo("File added: " + file.path);
-        }
-        foreach string deletedFile in event.deletedFiles {
-            log:printInfo("File deleted: " + deletedFile);
-        }
-    }
-}
-```
-
-#### Handle errors
-
-Use the `onError` handler to receive and handle errors that occur during file processing.
-
-```ballerina
-service on remoteServer {
-    remote function onFileJson(json content, smb:FileInfo fileInfo) returns error? {
-        // Process JSON file
-    }
-
-    remote function onError(error err) {
-        log:printError("Error occurred while processing file", 'error = err);
-    }
-}
-```
-
 ### Advanced configuration options
 
 The SMB client and listener support several advanced configuration options:
@@ -537,27 +454,4 @@ smb:ClientConfiguration smbConfig = {
     bufferSize: 131072,
     connectTimeout: 60.0
 };
-```
-
-##### Relaxed data binding
-
-Enable relaxed data binding to allow flexible parsing of JSON, XML, and CSV content. When enabled, the parser will ignore unknown fields and use default values for missing fields instead of returning errors.
-
-```ballerina
-smb:ClientConfiguration smbConfig = {
-    host: "<The SMB host>",
-    share: "<The SMB share name>",
-    laxDataBinding: true
-};
-
-smb:Client smbClient = check new(smbConfig);
-
-type User record {|
-    string name;
-    int age;
-    string country; // fields not in the result will be mapped to default/empty values
-    int postalCode;
-|};
-
-User user = check smbClient->getJson("/users/data.json");
 ```

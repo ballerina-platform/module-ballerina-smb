@@ -1,16 +1,91 @@
 [package]
-distribution = "2201.13.0"
 org = "ballerina"
 name = "smb"
 version = "@toml.version@"
-license = ["Apache-2.0"]
 authors = ["Ballerina"]
-keywords = [] # TODO: Add keywords
-# icon = "icon.png" # TODO: Add icon
+keywords = ["smb", "file", "network shares"]
 repository = "https://github.com/ballerina-platform/module-ballerina-smb"
-
-[build-options]
-observabilityIncluded = true
+# icon = "icon.png"
+license = ["Apache-2.0"]
+distribution = "2201.12.0"
 
 [platform.java21]
 graalvmCompatible = true
+
+[[platform.java21.dependency]]
+groupId = "com.hierynomus"
+artifactId = "smbj"
+version = "@smbj.version@"
+path = "./lib/smbj-@smbj.version@.jar"
+
+[[platform.java21.dependency]]
+groupId = "com.hierynomus"
+artifactId = "asn-one"
+version = "@asn.one.version@"
+path = "./lib/asn-one-@asn.one.version@.jar"
+
+[[platform.java21.dependency]]
+groupId = "org.bouncycastle"
+artifactId = "bcprov-jdk15on"
+version = "@bouncycastle.version@"
+path = "./lib/bcprov-jdk15on-@bouncycastle.version@.jar"
+
+[[platform.java21.dependency]]
+groupId = "eu.agno3.jcifs"
+artifactId = "jcifs-ng"
+version = "@jcifs.version@"
+path = "./lib/jcifs-ng-@jcifs.version@.jar"
+
+[[platform.java21.dependency]]
+groupId = "net.engio"
+artifactId = "mbassador"
+version = "@mbassador.version@"
+path = "./lib/mbassador-@mbassador.version@.jar"
+
+[[platform.java21.dependency]]
+groupId = "org.slf4j"
+artifactId = "slf4j-api"
+version = "@slf4j.version@"
+path = "./lib/slf4j-api-@slf4j.version@.jar"
+
+[[platform.java21.dependency]]
+groupId = "commons-io"
+artifactId = "commons-io"
+version = "@commons.io.version@"
+path = "./lib/commons-io-@commons.io.version@.jar"
+
+# [[platform.java21.dependency]]
+# groupId = "org.apache.commons"
+# artifactId = "commons-lang3"
+# version = "@commons.lang3.version@"
+# path = "./lib/commons-lang3-@commons.lang3.version@.jar"
+
+[[platform.java21.dependency]]
+groupId = "org.apache.commons"
+artifactId = "commons-vfs2"
+version = "@commons.vfs2.version@"
+path = "./lib/commons-vfs2-@commons.vfs2.version@.jar"
+
+[[platform.java21.dependency]]
+groupId = "io.ballerina.lib"
+artifactId = "smb-native"
+version = "@toml.version@"
+path = "../native/build/libs/smb-native-@project.version@.jar"
+
+[[platform.java21.dependency]]
+groupId = "io.ballerina.lib"
+artifactId = "data.jsondata-native"
+version = "@data.jsondata.version@"
+path = "./lib/data.jsondata-native-@data.jsondata.version@.jar"
+
+[[platform.java21.dependency]]
+groupId = "io.ballerina.lib"
+artifactId = "data.xmldata-native"
+version = "@data.xmldata.version@"
+path = "./lib/data.xmldata-native-@data.xmldata.version@.jar"
+
+[[platform.java21.dependency]]
+groupId = "io.ballerina.lib"
+artifactId = "data.csv-native"
+version = "@data.csv.version@"
+path = "./lib/data.csv-native-@data.csv.version@.jar"
