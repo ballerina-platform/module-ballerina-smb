@@ -63,8 +63,8 @@ path = "./lib/commons-io-2.18.0.jar"
 [[platform.java21.dependency]]
 groupId = "org.apache.commons"
 artifactId = "commons-vfs2"
-version = "2.9.0"
-path = "./lib/commons-vfs2-2.9.0.jar"
+version = "2.10.0"
+path = "./lib/commons-vfs2-2.10.0.jar"
 
 [[platform.java21.dependency]]
 groupId = "io.ballerina.lib"
