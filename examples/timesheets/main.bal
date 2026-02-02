@@ -57,19 +57,6 @@ listener smb:Listener smbListener = check new ({
     pollingInterval: 10
 });
 
-final smb:Client smbClient = check new ({
-    host: smbHost,
-    port: smbPort,
-    share: smbShare,
-    auth: {
-        credentials: {
-            username: smbUsername,
-            password: smbPassword,
-            domain: smbDomain
-        }
-    }
-});
-
 @smb:ServiceConfig {
     path: "/timesheets/incoming"
 }
@@ -100,7 +87,7 @@ service "timesheetValidator" on smbListener {
         
         // Save validated records to SMB
         string validatedPath = string `/timesheets/validated/${fileInfo.name}`;
-        check smbClient->putCsv(validatedPath, <record{}[][]>[content], smb:OVERWRITE);
+        check caller->putCsv(validatedPath, <record{}[][]>[content], smb:OVERWRITE);
         log:printInfo(string `Validated ${content.length()} records saved to ${validatedPath}`);
         
         // Move original file to processed folder
@@ -157,14 +144,4 @@ function quarantineFile(smb:Caller caller, smb:FileInfo fileInfo, string reason)
     string quarantinePath = string `/timesheets/quarantine/${reason}_${timestamp}_${fileInfo.name}`;
     check caller->move(fileInfo.path, quarantinePath);
     log:printWarn(string `File quarantined: ${fileInfo.name} (reason: ${reason})`);
-}
-
-function ensureDirectoryExists(string path) returns error? {
-    boolean|smb:Error exists = smbClient->exists(path);
-    if exists is smb:Error {
-        return exists;
-    }
-    if !exists {
-        check smbClient->mkdir(path);
-    }
 }

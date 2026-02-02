@@ -60,19 +60,6 @@ listener smb:Listener smbListener = check new ({
     pollingInterval: 10
 });
 
-final smb:Client smbClient = check new ({
-    host: smbHost,
-    port: smbPort,
-    share: smbShare,
-    auth: {
-        credentials: {
-            username: smbUsername,
-            password: smbPassword,
-            domain: smbDomain
-        }
-    }
-});
-
 @smb:ServiceConfig {
     path: "/sales/new"
 }
@@ -94,10 +81,8 @@ service "salesReportProcessor" on smbListener {
 
         // Persist sales records to CSV file
         string csvPath = "/sales/data/sales_data.json";
-        check ensureDirectoryExists("/sales/data");
         check caller->putJson(csvPath, salesRecords, smb:APPEND);
         log:printInfo(string `Added ${salesRecords.length()} sales records to ${csvPath}`);
-        check ensureDirectoryExists("/sales/processed");
         string destinationPath = string `/sales/processed/${fileInfo.name}`;
         check caller->move(fileInfo.path, destinationPath);
         log:printInfo(string `File moved to processed: ${fileInfo.name}`);
@@ -108,12 +93,3 @@ service "salesReportProcessor" on smbListener {
     }
 }
 
-function ensureDirectoryExists(string path) returns error? {
-    boolean|smb:Error exists = smbClient->exists(path);
-    if exists is smb:Error {
-        return exists;
-    }
-    if !exists {
-        check smbClient->mkdir(path);
-    }
-}
