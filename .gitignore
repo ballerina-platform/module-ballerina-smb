@@ -46,6 +46,7 @@ target/
 generated/
 .ballerina
 **/Config.toml
+**/Dependencies.toml
 
 # Ignore Gradle project-specific cache directory
 .gradle
