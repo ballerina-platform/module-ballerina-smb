@@ -274,8 +274,33 @@ type XmlConfigWithAnnotation record {|
     int timeout;
 |};
 
+// Variables for Caller parameter tests
+int callerTextCounter = 0;
+boolean callerTextUsed = false;
+string? callerTextContent = ();
+
+int callerJsonCounter = 0;
+boolean callerJsonUsed = false;
+json? callerJsonContent = ();
+
+int callerXmlCounter = 0;
+boolean callerXmlUsed = false;
+xml? callerXmlContent = ();
+
+int callerCsvCounter = 0;
+boolean callerCsvUsed = false;
+string[][]? callerCsvContent = ();
+
+int callerBinaryCounter = 0;
+boolean callerBinaryUsed = false;
+byte[]? callerBinaryContent = ();
+
+int callerStreamCounter = 0;
+boolean callerStreamUsed = false;
+int callerStreamBytes = 0;
+
 Service jsonHandlerService = service object {
-    remote function onFileJson(Person content, FileInfo fileInfo) returns error? {
+    remote function onFileJson(Person content, Caller caller, FileInfo fileInfo) returns error? {
         jsonFileCounter += 1;
         capturedJsonType = content;
         capturedJsonFileName = fileInfo.name;
@@ -403,6 +428,97 @@ Service xmlRecordService = service object {
     }
 };
 
+Service callerTextService = service object {
+    remote function onFileText(string content, Caller caller, FileInfo fileInfo) returns error? {
+        callerTextCounter += 1;
+        callerTextContent = content;
+        error? result = caller->putText("/caller_tests/text_response.txt", "Response from text handler", OVERWRITE);
+        callerTextUsed = result is ();
+    }
+
+    function onError(error err) returns error? {
+        io:println("Caller text handler error: ", err.message());
+    }
+};
+
+Service callerJsonService = service object {
+    remote function onFileJson(json content, Caller caller, FileInfo fileInfo) returns error? {
+        callerJsonCounter += 1;
+        callerJsonContent = content;
+        json response = {status: "processed", originalFile: fileInfo.name};
+        error? result = caller->putJson("/caller_tests/json_response.json", response, OVERWRITE);
+        callerJsonUsed = result is ();
+    }
+
+    function onError(error err) returns error? {
+        io:println("Caller json handler error: ", err.message());
+    }
+};
+
+Service callerXmlService = service object {
+    remote function onFileXml(xml content, Caller caller, FileInfo fileInfo) returns error? {
+        callerXmlCounter += 1;
+        callerXmlContent = content;
+        xml response = xml `<response><status>processed</status></response>`;
+        error? result = caller->putXml("/caller_tests/xml_response.xml", response, OVERWRITE);
+        callerXmlUsed = result is ();
+    }
+
+    function onError(error err) returns error? {
+        io:println("Caller xml handler error: ", err.message());
+    }
+};
+
+Service callerCsvService = service object {
+    remote function onFileCsv(string[][] content, Caller caller, FileInfo fileInfo) returns error? {
+        callerCsvCounter += 1;
+        callerCsvContent = content;
+        string[][] response = [["status", "rows"], ["processed", content.length().toString()]];
+        error? result = caller->putCsv("/caller_tests/csv_response.csv", response, OVERWRITE);
+        callerCsvUsed = result is ();
+    }
+
+    function onError(error err) returns error? {
+        io:println("Caller csv handler error: ", err.message());
+    }
+};
+
+Service callerBinaryService = service object {
+    remote function onFile(byte[] content, Caller caller, FileInfo fileInfo) returns error? {
+        callerBinaryCounter += 1;
+        callerBinaryContent = content;
+        byte[] response = "Binary response".toBytes();
+        error? result = caller->putBytes("/caller_tests/binary_response.bin", response, OVERWRITE);
+        callerBinaryUsed = result is ();
+    }
+
+    function onError(error err) returns error? {
+        io:println("Caller binary handler error: ", err.message());
+    }
+};
+
+Service callerStreamService = service object {
+    remote function onFile(stream<byte[], error?> content, Caller caller, FileInfo fileInfo) returns error? {
+        callerStreamCounter += 1;
+        int totalBytes = 0;
+        error? result = content.forEach(function(byte[] chunk) {
+            totalBytes += chunk.length();
+        });
+        callerStreamBytes = totalBytes;
+        byte[] response = string `Stream processed: ${totalBytes} bytes`.toBytes();
+        error? writeResult = caller->putBytes("/caller_tests/stream_response.txt", response, OVERWRITE);
+        callerStreamUsed = writeResult is ();
+        
+        if result is error {
+            return result;
+        }
+    }
+
+    function onError(error err) returns error? {
+        io:println("Caller stream handler error: ", err.message());
+    }
+};
+
 @test:Config {
 }
 function testOnFileTextHandler() returns error? {
@@ -484,7 +600,7 @@ function testOnFileJsonHandler() returns error? {
     check jsonListener.immediateStop();
 
     test:assertTrue(jsonFileCounter >= 1);
-    test:assertTrue(capturedJsonContent !is ());
+    test:assertTrue(capturedJsonType !is ());
     test:assertEquals(capturedJsonFileName, "user_data.json");
 }
 
@@ -815,7 +931,6 @@ function testOnFileByteStreamHandler() returns error? {
     test:assertTrue(binaryStreamChunkCount == 1, "Stream should have processed exactly 1 chunk");
     test:assertTrue(binaryStreamTotalBytes >= 20000, "Stream should have processed all bytes");
     test:assertEquals(capturedBinaryStreamFileName, "large_binary.dat", "File name should match");
-    _ = check smbClient->rmdir("content_tests");
 }
 
 @test:Config {
@@ -869,5 +984,351 @@ function testOnFileXmlRecordHandler() returns error? {
         test:assertFail("XML record content should be captured");
     }
     test:assertEquals(capturedXmlRecordFileName, "db_config.xml", "File name should match");
-    _ = check smbClient->rmdir("xml_record_tests");
+}
+
+@test:Config {
+    groups: ["listener", "caller"],
+    dependsOn: [testOnFileXmlRecordHandler]
+}
+function testOnFileTextWithCaller() returns error? {
+    callerTextCounter = 0;
+    callerTextUsed = false;
+    callerTextContent = ();
+
+    boolean exists = check smbClient->exists("/caller_tests");
+    if !exists {
+        check smbClient->mkdir("/caller_tests");
+    }
+
+    Listener callerTextListener = check new ({
+        host: "localhost",
+        port: 445,
+        auth: {
+            credentials: {
+                username: "testuser",
+                password: "testpass"
+            }
+        },
+        share: "testshare",
+        pollingInterval: 2,
+        bufferSize: 65536
+    });
+
+    check callerTextListener.attach(callerTextService);
+    check callerTextListener.'start();
+    runtime:registerListener(callerTextListener);
+
+    runtime:sleep(3);
+
+    callerTextCounter = 0;
+    callerTextUsed = false;
+    callerTextContent = ();
+
+    string testContent = "Test content for caller text handler";
+    error? putResult = smbClient->putText("/caller_tests/input.txt", testContent);
+    test:assertEquals(putResult, ());
+
+    runtime:sleep(5);
+    check callerTextListener.immediateStop();
+
+    test:assertTrue(callerTextCounter >= 1, "onFileText with Caller should be triggered");
+    test:assertEquals(callerTextContent, testContent, "Text content should match");
+    test:assertTrue(callerTextUsed, "Caller should be used successfully");
+    
+    // Verify the response file was created
+    string|Error responseContent = smbClient->getText("/caller_tests/text_response.txt");
+    test:assertTrue(responseContent is string, "Response file should exist");
+    if responseContent is string {
+        test:assertEquals(responseContent, "Response from text handler", "Response content should match");
+    }
+}
+
+@test:Config {
+    groups: ["listener", "caller"],
+    dependsOn: [testOnFileTextWithCaller]
+}
+function testOnFileJsonWithCaller() returns error? {
+    callerJsonCounter = 0;
+    callerJsonUsed = false;
+    callerJsonContent = ();
+    boolean exists = check smbClient->exists("/caller_tests");
+    if !exists {
+        check smbClient->mkdir("/caller_tests");
+    }
+
+    Listener callerJsonListener = check new ({
+        host: "localhost",
+        port: 445,
+        auth: {
+            credentials: {
+                username: "testuser",
+                password: "testpass"
+            }
+        },
+        share: "testshare",
+        pollingInterval: 2,
+        bufferSize: 65536
+    });
+
+    check callerJsonListener.attach(callerJsonService);
+    check callerJsonListener.'start();
+    runtime:registerListener(callerJsonListener);
+
+    runtime:sleep(3);
+
+    callerJsonCounter = 0;
+    callerJsonUsed = false;
+    callerJsonContent = ();
+
+    json testData = {name: "John", age: 30, email: "john@example.com"};
+    error? putResult = smbClient->putJson("/caller_tests/input.json", testData);
+    test:assertEquals(putResult, ());
+
+    runtime:sleep(5);
+    check callerJsonListener.immediateStop();
+
+    test:assertTrue(callerJsonCounter >= 1, "onFileJson with Caller should be triggered");
+    test:assertTrue(callerJsonContent is json, "JSON content should be captured");
+    test:assertTrue(callerJsonUsed, "Caller should be used successfully");
+    
+    // Verify the response file was created
+    json|Error responseContent = smbClient->getJson("/caller_tests/json_response.json");
+    test:assertTrue(responseContent is json, "Response file should exist");
+    if responseContent is json {
+        test:assertEquals(responseContent.status, "processed", "Response status should match");
+    }
+}
+
+@test:Config {
+    groups: ["listener", "caller"],
+    dependsOn: [testOnFileJsonWithCaller]
+}
+function testOnFileXmlWithCaller() returns error? {
+    callerXmlCounter = 0;
+    callerXmlUsed = false;
+    callerXmlContent = ();
+
+    boolean exists = check smbClient->exists("/caller_tests");
+    if !exists {
+        check smbClient->mkdir("/caller_tests");
+    }
+
+    Listener callerXmlListener = check new ({
+        host: "localhost",
+        port: 445,
+        auth: {
+            credentials: {
+                username: "testuser",
+                password: "testpass"
+            }
+        },
+        share: "testshare",
+        pollingInterval: 2,
+        bufferSize: 65536
+    });
+
+    check callerXmlListener.attach(callerXmlService);
+    check callerXmlListener.'start();
+    runtime:registerListener(callerXmlListener);
+
+    runtime:sleep(3);
+
+    callerXmlCounter = 0;
+    callerXmlUsed = false;
+    callerXmlContent = ();
+
+    xml testData = xml `<person><name>John</name><age>30</age></person>`;
+    error? putResult = smbClient->putXml("/caller_tests/input.xml", testData);
+    test:assertEquals(putResult, ());
+
+    runtime:sleep(5);
+    check callerXmlListener.immediateStop();
+
+    test:assertTrue(callerXmlCounter >= 1, "onFileXml with Caller should be triggered");
+    test:assertTrue(callerXmlContent is xml, "XML content should be captured");
+    test:assertTrue(callerXmlUsed, "Caller should be used successfully");
+    
+    // Verify the response file was created
+    xml|Error responseContent = smbClient->getXml("/caller_tests/xml_response.xml");
+    test:assertTrue(responseContent is xml, "Response file should exist");
+    if responseContent is xml {
+        test:assertTrue(responseContent.toString().includes("processed"), "Response should contain status");
+    }
+}
+
+@test:Config {
+    groups: ["listener", "caller"],
+    dependsOn: [testOnFileXmlWithCaller]
+}
+function testOnFileCsvWithCaller() returns error? {
+    callerCsvCounter = 0;
+    callerCsvUsed = false;
+    callerCsvContent = ();
+
+    boolean exists = check smbClient->exists("/caller_tests");
+    if !exists {
+        check smbClient->mkdir("/caller_tests");
+    }
+
+    Listener callerCsvListener = check new ({
+        host: "localhost",
+        port: 445,
+        auth: {
+            credentials: {
+                username: "testuser",
+                password: "testpass"
+            }
+        },
+        share: "testshare",
+        pollingInterval: 2,
+        bufferSize: 65536
+    });
+
+    check callerCsvListener.attach(callerCsvService);
+    check callerCsvListener.'start();
+    runtime:registerListener(callerCsvListener);
+
+    runtime:sleep(3);
+
+    callerCsvCounter = 0;
+    callerCsvUsed = false;
+    callerCsvContent = ();
+
+    string[][] testData = [["id", "name", "email"], ["1", "John", "john@test.com"], ["2", "Jane", "jane@test.com"]];
+    error? putResult = smbClient->putCsv("/caller_tests/input.csv", testData);
+    test:assertEquals(putResult, ());
+
+    runtime:sleep(5);
+    check callerCsvListener.immediateStop();
+
+    test:assertTrue(callerCsvCounter >= 1, "onFileCsv with Caller should be triggered");
+    test:assertTrue(callerCsvContent is string[][], "CSV content should be captured");
+    test:assertTrue(callerCsvUsed, "Caller should be used successfully");
+    
+    // Verify the response file was created
+    string[][]|Error responseContent = smbClient->getCsv("/caller_tests/csv_response.csv");
+    test:assertTrue(responseContent is string[][], "Response file should exist");
+    if responseContent is string[][] {
+        test:assertTrue(responseContent.length() > 0, "Response should have rows");
+    }
+}
+
+@test:Config {
+    groups: ["listener", "caller"],
+    dependsOn: [testOnFileCsvWithCaller]
+}
+function testOnFileWithCaller() returns error? {
+    callerBinaryCounter = 0;
+    callerBinaryUsed = false;
+    callerBinaryContent = ();
+
+    boolean exists = check smbClient->exists("/caller_tests");
+    if !exists {
+        check smbClient->mkdir("/caller_tests");
+    }
+
+    Listener callerBinaryListener = check new ({
+        host: "localhost",
+        port: 445,
+        auth: {
+            credentials: {
+                username: "testuser",
+                password: "testpass"
+            }
+        },
+        share: "testshare",
+        pollingInterval: 2,
+        bufferSize: 65536
+    });
+
+    check callerBinaryListener.attach(callerBinaryService);
+    check callerBinaryListener.'start();
+    runtime:registerListener(callerBinaryListener);
+
+    runtime:sleep(3);
+
+    callerBinaryCounter = 0;
+    callerBinaryUsed = false;
+    callerBinaryContent = ();
+
+    byte[] testData = [0x48, 0x65, 0x6C, 0x6C, 0x6F]; // "Hello"
+    error? putResult = smbClient->putBytes("/caller_tests/input.bin", testData);
+    test:assertEquals(putResult, ());
+
+    runtime:sleep(5);
+    check callerBinaryListener.immediateStop();
+
+    test:assertTrue(callerBinaryCounter >= 1, "onFile with Caller should be triggered");
+    test:assertTrue(callerBinaryContent is byte[], "Binary content should be captured");
+    test:assertTrue(callerBinaryUsed, "Caller should be used successfully");
+    
+    // Verify the response file was created
+    byte[]|Error responseContent = smbClient->getBytes("/caller_tests/binary_response.bin");
+    test:assertTrue(responseContent is byte[], "Response file should exist");
+    if responseContent is byte[] {
+        test:assertTrue(responseContent.length() > 0, "Response should have content");
+    }
+}
+
+@test:Config {
+    groups: ["listener", "caller"],
+    dependsOn: [testOnFileWithCaller]
+}
+function testOnFileStreamWithCaller() returns error? {
+    callerStreamCounter = 0;
+    callerStreamUsed = false;
+    callerStreamBytes = 0;
+
+    boolean exists = check smbClient->exists("/caller_tests");
+    if !exists {
+        check smbClient->mkdir("/caller_tests");
+    }
+
+    Listener callerStreamListener = check new ({
+        host: "localhost",
+        port: 445,
+        auth: {
+            credentials: {
+                username: "testuser",
+                password: "testpass"
+            }
+        },
+        share: "testshare",
+        pollingInterval: 2,
+        bufferSize: 65536
+    });
+
+    check callerStreamListener.attach(callerStreamService);
+    check callerStreamListener.'start();
+    runtime:registerListener(callerStreamListener);
+
+    runtime:sleep(3);
+
+    callerStreamCounter = 0;
+    callerStreamUsed = false;
+    callerStreamBytes = 0;
+
+    byte[] largeData = [];
+    int i = 0;
+    while i < 10000 {
+        largeData.push(<byte>(i % 256));
+        i += 1;
+    }
+    error? putResult = smbClient->putBytes("/caller_tests/large_input.dat", largeData);
+    test:assertEquals(putResult, ());
+
+    runtime:sleep(5);
+    check callerStreamListener.immediateStop();
+
+    test:assertTrue(callerStreamCounter >= 1, "onFile stream with Caller should be triggered");
+    test:assertTrue(callerStreamBytes >= 10000, "Stream should process all bytes");
+    test:assertTrue(callerStreamUsed, "Caller should be used successfully");
+    
+    // Verify the response file was created
+    byte[]|Error responseContent = smbClient->getBytes("/caller_tests/stream_response.txt");
+    test:assertTrue(responseContent is byte[], "Response file should exist");
+    if responseContent is byte[] {
+        string responseText = check string:fromBytes(responseContent);
+        test:assertTrue(responseText.includes("Stream processed"), "Response should contain expected text");
+    }
 }
