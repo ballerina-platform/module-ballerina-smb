@@ -82,6 +82,7 @@ if [ -d "$BAL_DESTINATION_DIR" ]; then
   rm -rf "$BAL_DESTINATION_DIR"
 fi
 if [ -d "$BAL_SOURCE_DIR" ]; then
+  mkdir -p "$(dirname "$BAL_DESTINATION_DIR")"
   cp -r "$BAL_SOURCE_DIR" "$BAL_DESTINATION_DIR"
   echo "Successfully updated the local central repository."
 else
