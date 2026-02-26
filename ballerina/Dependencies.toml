@@ -160,7 +160,7 @@ dependencies = [
 [[package]]
 org = "ballerina"
 name = "smb"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
 	{org = "ballerina", name = "data.csv"},
 	{org = "ballerina", name = "data.jsondata"},
