@@ -917,7 +917,7 @@ public class SmbListenerHelper {
                     null);
             env.getRuntime().callMethod(service, ON_ERROR_METHOD, new StrandMetadata(true, null), bError);
         } catch (Exception exception) {
-            log.debug("Service does not implement 'onError' or error invoking 'onError': {}", exception.getMessage());
+            // Ignore if triggering onError fails 
         }
     }
 
@@ -939,8 +939,8 @@ public class SmbListenerHelper {
         for (SmbService registration : services) {
             try {
                 env.getRuntime().callMethod(registration.service(), ON_ERROR_METHOD, null, bError);
-            } catch (Exception ex) {
-                log.debug("Service does not implement onError or error invoking onError: {}", ex.getMessage());
+            } catch (Exception ignored) {
+                // Ignore if triggering onError fails 
             }
         }
     }
