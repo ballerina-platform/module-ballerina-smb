@@ -139,6 +139,7 @@ public class SmbListenerHelper {
     private static final String ON_FILE_XML = "onFileXml";
     private static final String ON_FILE_CSV = "onFileCsv";
     private static final String ON_FILE = "onFile";
+    private static final String ON_FILE_DELETE = "onFileDelete";
     private static final String EXT_TXT = "txt";
     private static final String EXT_JSON = "json";
     private static final String EXT_XML = "xml";
@@ -431,9 +432,20 @@ public class SmbListenerHelper {
         }
         Map<String, Set<String>> previousFiles =
                 (Map<String, Set<String>>) listenerEndpoint.getNativeData(LISTENER_PREVIOUS_FILES);
+        Set<String> prevFiles = previousFiles.getOrDefault(path, new HashSet<>());
+        List<String> deletedFiles = new ArrayList<>();
+        for (String prevFile : prevFiles) {
+            if (!currentFiles.contains(prevFile)) {
+                deletedFiles.add(prevFile);
+            }
+        }
+
         previousFiles.put(path, currentFiles);
         if (!addedFiles.isEmpty()) {
             notifyServicesForPath(env, path, addedFiles, allServices, diskShare, listenerConfig);
+        }
+        if (!deletedFiles.isEmpty()) {
+            notifyServicesForDeletedFiles(env, path, deletedFiles, allServices, listenerConfig);
         }
     }
 
@@ -506,6 +518,64 @@ public class SmbListenerHelper {
                     notifyServiceOnError(env, service, exception);
                 }
             }
+        }
+    }
+
+    private static void notifyServicesForDeletedFiles(Environment env, String changedPath,
+                                                       List<String> deletedFiles,
+                                                       List<SmbService> allServices,
+                                                       BMap<BString, Object> listenerConfig) {
+        if (allServices == null || allServices.isEmpty()) {
+            return;
+        }
+        List<SmbService> servicesToNotify = new ArrayList<>();
+        for (SmbService registration : allServices) {
+            if (isPathMatch(changedPath, registration.path())) {
+                servicesToNotify.add(registration);
+            }
+        }
+        if (servicesToNotify.isEmpty()) {
+            return;
+        }
+        for (SmbService registration : servicesToNotify) {
+            BObject service = registration.service();
+            ObjectType serviceType = (ObjectType) TypeUtils.getReferredType(TypeUtils.getType(service));
+            if (hasMethod(serviceType, ON_FILE_DELETE)) {
+                MethodType method = getMethod(serviceType, ON_FILE_DELETE);
+                if (method != null) {
+                    for (String deletedFile : deletedFiles) {
+                        invokeOnFileDeleteHandler(env, service, method, deletedFile, listenerConfig);
+                    }
+                }
+            }
+        }
+    }
+
+    private static void invokeOnFileDeleteHandler(Environment env, BObject service, MethodType method,
+                                                   String deletedFile, BMap<BString, Object> listenerConfig) {
+        try {
+            Parameter[] parameters = method.getParameters();
+            if (parameters.length < 1) {
+                return;
+            }
+
+            List<Object> args = new ArrayList<>();
+            args.add(StringUtils.fromString(deletedFile));
+
+            for (int i = 1; i < parameters.length; i++) {
+                Type paramType = TypeUtils.getReferredType(parameters[i].type);
+                String paramTypeName = paramType.getName();
+
+                if (CALLER.equals(paramTypeName)) {
+                    BObject caller = createCaller(listenerConfig);
+                    if (caller != null) {
+                        args.add(caller);
+                    }
+                }
+            }
+            env.getRuntime().callMethod(service, ON_FILE_DELETE, null, args.toArray());
+        } catch (Exception e) {
+            notifyServiceOnError(env, service, e);
         }
     }
 
