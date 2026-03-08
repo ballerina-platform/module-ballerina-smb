@@ -839,17 +839,13 @@ public class SmbListenerHelper {
     }
 
     private static void notifyServiceOnError(Environment env, BObject service, Exception e) {
-        try {
-            BError bError = ErrorCreator.createError(
+        BError bError = ErrorCreator.createError(
                     ModuleUtils.getModule(),
                     SMB_ERROR,
                     StringUtils.fromString(e.getMessage()),
                     null,
                     null);
-            env.getRuntime().callMethod(service, ON_ERROR_METHOD, new StrandMetadata(true, null), bError);
-        } catch (Exception exception) {
-            // Service does not implement onError - silently ignore
-        }
+        env.getRuntime().callMethod(service, ON_ERROR_METHOD, new StrandMetadata(true, null), bError);
     }
 
     private static boolean isPathMatch(String changedPath, String registeredPath) {
@@ -915,7 +911,6 @@ public class SmbListenerHelper {
                 options.put("storeKey", "true");
                 options.put("doNotPrompt", "true");
                 options.put("principal", principal);
-                options.put("debug", "false");
 
                 return new AppConfigurationEntry[]{
                         new AppConfigurationEntry("com.sun.security.auth.module.Krb5LoginModule",
