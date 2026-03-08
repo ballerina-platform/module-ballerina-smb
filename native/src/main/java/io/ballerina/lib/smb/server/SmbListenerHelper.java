@@ -839,13 +839,17 @@ public class SmbListenerHelper {
     }
 
     private static void notifyServiceOnError(Environment env, BObject service, Exception e) {
-        BError bError = ErrorCreator.createError(
+        try {
+            BError bError = ErrorCreator.createError(
                     ModuleUtils.getModule(),
                     SMB_ERROR,
                     StringUtils.fromString(e.getMessage()),
                     null,
                     null);
-        env.getRuntime().callMethod(service, ON_ERROR_METHOD, new StrandMetadata(true, null), bError);
+            env.getRuntime().callMethod(service, ON_ERROR_METHOD, new StrandMetadata(true, null), bError);
+        } catch (Exception exception) {
+            // Ignore if triggering onError fails 
+        }
     }
 
     private static boolean isPathMatch(String changedPath, String registeredPath) {
@@ -864,7 +868,11 @@ public class SmbListenerHelper {
         BError bError = ErrorCreator.createError(ModuleUtils.getModule(), SMB_ERROR,
                 StringUtils.fromString(e.getMessage()), null, null);
         for (SmbService registration : services) {
-            env.getRuntime().callMethod(registration.service(), ON_ERROR_METHOD, null, bError);
+            try {
+                env.getRuntime().callMethod(registration.service(), ON_ERROR_METHOD, null, bError);
+            } catch (Exception ignored) {
+                // Ignore if triggering onError fails 
+            }
         }
     }
 
