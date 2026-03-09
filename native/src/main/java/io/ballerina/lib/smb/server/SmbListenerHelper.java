@@ -407,7 +407,8 @@ public class SmbListenerHelper {
     private static void checkPathForChanges(Environment env, BObject listenerEndpoint, DiskShare diskShare,
                                            String path, List<SmbService> allServices,
                                            BMap<BString, Object> listenerConfig) {
-        List<FileIdBothDirectoryInformation> files = diskShare.list(path);
+        String listPath = path.startsWith(SLASH_SUFFIX) ? path.substring(1) : path;
+        List<FileIdBothDirectoryInformation> files = diskShare.list(listPath);
         Set<String> currentFiles = new HashSet<>();
         List<BMap<BString, Object>> addedFiles = new ArrayList<>();
         for (FileIdBothDirectoryInformation fileInfo : files) {
@@ -415,19 +416,19 @@ public class SmbListenerHelper {
             if (".".equals(fileName) || "..".equals(fileName)) {
                 continue;
             }
-            String fileKey = path + SLASH_SUFFIX + fileName;
-            currentFiles.add(fileKey);
-            Map<String, Set<String>> previousFiles =
-                    (Map<String, Set<String>>) listenerEndpoint.getNativeData(LISTENER_PREVIOUS_FILES);
-            Set<String> prevFiles = previousFiles.getOrDefault(path, new HashSet<>());
-            if (!prevFiles.contains(fileKey)) {
-                BMap<BString, Object> fileInfoRecord = createFileInfoRecord(fileInfo, path);
-                addedFiles.add(fileInfoRecord);
-            }
             boolean isFolder = (fileInfo.getFileAttributes() & 0x00000010) != 0;
+            String fileKey = path.endsWith(SLASH_SUFFIX) ? path + fileName : path + SLASH_SUFFIX + fileName;
             if (isFolder) {
-                String subPath = path + SLASH_SUFFIX + fileName;
-                checkPathForChanges(env, listenerEndpoint, diskShare, subPath, allServices, listenerConfig);
+                checkPathForChanges(env, listenerEndpoint, diskShare, fileKey, allServices, listenerConfig);
+            } else {
+                currentFiles.add(fileKey);
+                Map<String, Set<String>> previousFiles =
+                        (Map<String, Set<String>>) listenerEndpoint.getNativeData(LISTENER_PREVIOUS_FILES);
+                Set<String> prevFiles = previousFiles.getOrDefault(path, new HashSet<>());
+                if (!prevFiles.contains(fileKey)) {
+                    BMap<BString, Object> fileInfoRecord = createFileInfoRecord(fileInfo, path);
+                    addedFiles.add(fileInfoRecord);
+                }
             }
         }
         Map<String, Set<String>> previousFiles =
