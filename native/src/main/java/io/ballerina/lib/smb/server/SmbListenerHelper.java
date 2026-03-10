@@ -23,6 +23,7 @@ import com.hierynomus.msfscc.FileAttributes;
 import com.hierynomus.msfscc.fileinformation.FileIdBothDirectoryInformation;
 import com.hierynomus.mssmb2.SMB2CreateDisposition;
 import com.hierynomus.mssmb2.SMB2ShareAccess;
+import com.hierynomus.mssmb2.SMBApiException;
 import com.hierynomus.protocol.commons.EnumWithValue;
 import com.hierynomus.smbj.SMBClient;
 import com.hierynomus.smbj.auth.AuthenticationContext;
@@ -458,7 +459,12 @@ public class SmbListenerHelper {
     private static void collectFilesRecursively(DiskShare diskShare, String path,
                                                  Map<String, FileIdBothDirectoryInformation> result) {
         String listPath = path.startsWith(SLASH_SUFFIX) ? path.substring(1) : path;
-        List<FileIdBothDirectoryInformation> files = diskShare.list(listPath);
+        List<FileIdBothDirectoryInformation> files;
+        try {
+            files = diskShare.list(listPath);
+        } catch (SMBApiException e) {
+            throw new RuntimeException("Failed to list files for path: " + path + ". " + e.getMessage(), e);
+        }
         for (FileIdBothDirectoryInformation fileInfo : files) {
             String fileName = fileInfo.getFileName();
             if (DOT_IDENTIFIER.equals(fileName) || DOUBLE_DOT_IDENTIFIER.equals(fileName)) {
@@ -521,7 +527,7 @@ public class SmbListenerHelper {
         }
         List<SmbService> servicesToNotify = new ArrayList<>();
         for (SmbService registration : allServices) {
-            if (isPathMatch(changedPath, registration.path())) {
+            if (normalizePath(changedPath).equals(normalizePath(registration.path()))) {
                 servicesToNotify.add(registration);
             }
         }
@@ -556,7 +562,7 @@ public class SmbListenerHelper {
         }
         List<SmbService> servicesToNotify = new ArrayList<>();
         for (SmbService registration : allServices) {
-            if (isPathMatch(changedPath, registration.path())) {
+            if (normalizePath(changedPath).equals(normalizePath(registration.path()))) {
                 servicesToNotify.add(registration);
             }
         }
@@ -944,15 +950,6 @@ public class SmbListenerHelper {
         } catch (Exception exception) {
             // Ignore if triggering onError fails 
         }
-    }
-
-    private static boolean isPathMatch(String changedPath, String registeredPath) {
-        changedPath = normalizePath(changedPath);
-        registeredPath = normalizePath(registeredPath);
-        if (changedPath.equals(registeredPath)) {
-            return true;
-        }
-        return changedPath.startsWith(registeredPath + SLASH_SUFFIX);
     }
 
     private static void notifyServicesOnError(Environment env, List<SmbService> services, Exception e) {
