@@ -73,6 +73,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -407,33 +408,34 @@ public class SmbListenerHelper {
     private static void checkPathForChanges(Environment env, BObject listenerEndpoint, DiskShare diskShare,
                                            String path, List<SmbService> allServices,
                                            BMap<BString, Object> listenerConfig) {
-        String listPath = path.startsWith(SLASH_SUFFIX) ? path.substring(1) : path;
-        List<FileIdBothDirectoryInformation> files = diskShare.list(listPath);
-        Set<String> currentFiles = new HashSet<>();
-        List<BMap<BString, Object>> addedFiles = new ArrayList<>();
-        for (FileIdBothDirectoryInformation fileInfo : files) {
-            String fileName = fileInfo.getFileName();
-            if (".".equals(fileName) || "..".equals(fileName)) {
-                continue;
-            }
-            boolean isFolder = (fileInfo.getFileAttributes() & 0x00000010) != 0;
-            String fileKey = path.endsWith(SLASH_SUFFIX) ? path + fileName : path + SLASH_SUFFIX + fileName;
-            if (isFolder) {
-                checkPathForChanges(env, listenerEndpoint, diskShare, fileKey, allServices, listenerConfig);
-            } else {
-                currentFiles.add(fileKey);
-                Map<String, Set<String>> previousFiles =
-                        (Map<String, Set<String>>) listenerEndpoint.getNativeData(LISTENER_PREVIOUS_FILES);
-                Set<String> prevFiles = previousFiles.getOrDefault(path, new HashSet<>());
-                if (!prevFiles.contains(fileKey)) {
-                    BMap<BString, Object> fileInfoRecord = createFileInfoRecord(fileInfo, path);
-                    addedFiles.add(fileInfoRecord);
+        Map<String, Set<String>> previousFiles =
+                (Map<String, Set<String>>) listenerEndpoint.getNativeData(LISTENER_PREVIOUS_FILES);
+        Set<String> prevFiles = new HashSet<>(previousFiles.getOrDefault(path, new HashSet<>()));
+
+        Map<String, FileIdBothDirectoryInformation> currentFileInfos = new LinkedHashMap<>();
+        collectFilesRecursively(diskShare, path, currentFileInfos);
+        Set<String> currentFiles = new HashSet<>(currentFileInfos.keySet());
+
+        for (String prevFile : prevFiles) {
+            if (currentFiles.contains(prevFile)) {
+                String normalizedPath = prevFile.startsWith(SLASH_SUFFIX) ? prevFile.substring(1) : prevFile;
+                if (!diskShare.fileExists(normalizedPath)) {
+                    currentFiles.remove(prevFile);
                 }
             }
         }
-        Map<String, Set<String>> previousFiles =
-                (Map<String, Set<String>>) listenerEndpoint.getNativeData(LISTENER_PREVIOUS_FILES);
-        Set<String> prevFiles = previousFiles.getOrDefault(path, new HashSet<>());
+
+        List<BMap<BString, Object>> addedFiles = new ArrayList<>();
+        for (Map.Entry<String, FileIdBothDirectoryInformation> entry : currentFileInfos.entrySet()) {
+            String fileKey = entry.getKey();
+            if (!prevFiles.contains(fileKey)) {
+                String parentPath = fileKey.contains(SLASH_SUFFIX)
+                        ? fileKey.substring(0, fileKey.lastIndexOf(SLASH_SUFFIX))
+                        : path;
+                addedFiles.add(createFileInfoRecord(entry.getValue(), parentPath));
+            }
+        }
+
         List<String> deletedFiles = new ArrayList<>();
         for (String prevFile : prevFiles) {
             if (!currentFiles.contains(prevFile)) {
@@ -441,12 +443,32 @@ public class SmbListenerHelper {
             }
         }
 
-        previousFiles.put(path, currentFiles);
+        previousFiles.put(path, new HashSet<>(currentFiles));
         if (!addedFiles.isEmpty()) {
             notifyServicesForPath(env, path, addedFiles, allServices, diskShare, listenerConfig);
         }
         if (!deletedFiles.isEmpty()) {
             notifyServicesForDeletedFiles(env, path, deletedFiles, allServices, listenerConfig);
+        }
+    }
+
+    private static void collectFilesRecursively(DiskShare diskShare, String path,
+                                                 Map<String, FileIdBothDirectoryInformation> result) {
+        String listPath = path.startsWith(SLASH_SUFFIX) ? path.substring(1) : path;
+        List<FileIdBothDirectoryInformation> files = diskShare.list(listPath);
+        for (FileIdBothDirectoryInformation fileInfo : files) {
+            String fileName = fileInfo.getFileName();
+            if (".".equals(fileName) || "..".equals(fileName)) {
+                continue;
+            }
+            boolean isFolder = EnumWithValue.EnumUtils.isSet(
+                    fileInfo.getFileAttributes(), FileAttributes.FILE_ATTRIBUTE_DIRECTORY);
+            String fileKey = path.endsWith(SLASH_SUFFIX) ? path + fileName : path + SLASH_SUFFIX + fileName;
+            if (isFolder) {
+                collectFilesRecursively(diskShare, fileKey, result);
+            } else {
+                result.put(fileKey, fileInfo);
+            }
         }
     }
 
@@ -542,41 +564,40 @@ public class SmbListenerHelper {
             BObject service = registration.service();
             ObjectType serviceType = (ObjectType) TypeUtils.getReferredType(TypeUtils.getType(service));
             if (hasMethod(serviceType, ON_FILE_DELETE)) {
-                MethodType method = getMethod(serviceType, ON_FILE_DELETE);
-                if (method != null) {
-                    for (String deletedFile : deletedFiles) {
-                        invokeOnFileDeleteHandler(env, service, method, deletedFile, listenerConfig);
-                    }
+                for (String deletedFile : deletedFiles) {
+                    invokeOnFileDeleteHandler(env, service, serviceType, deletedFile, listenerConfig);
                 }
             }
         }
     }
 
-    private static void invokeOnFileDeleteHandler(Environment env, BObject service, MethodType method,
+    private static void invokeOnFileDeleteHandler(Environment env, BObject service, ObjectType serviceType,
                                                    String deletedFile, BMap<BString, Object> listenerConfig) {
-        try {
+        MethodType method = getMethod(serviceType, ON_FILE_DELETE);
+        List<Object> args = new ArrayList<>();
+        args.add(StringUtils.fromString(deletedFile));
+        if (method != null) {
             Parameter[] parameters = method.getParameters();
-            if (parameters.length < 1) {
-                return;
-            }
-
-            List<Object> args = new ArrayList<>();
-            args.add(StringUtils.fromString(deletedFile));
-
             for (int i = 1; i < parameters.length; i++) {
                 Type paramType = TypeUtils.getReferredType(parameters[i].type);
-                String paramTypeName = paramType.getName();
-
-                if (CALLER.equals(paramTypeName)) {
+                if (CALLER.equals(paramType.getName())) {
                     BObject caller = createCaller(listenerConfig);
                     if (caller != null) {
                         args.add(caller);
                     }
                 }
             }
-            env.getRuntime().callMethod(service, ON_FILE_DELETE, null, args.toArray());
+        }
+        try {
+            Object result = env.getRuntime().callMethod(service, ON_FILE_DELETE,
+                    new StrandMetadata(true, null), args.toArray());
+            if (result instanceof BError) {
+                ((BError) result).printStackTrace();
+            }
+        } catch (BError error) {
+            error.printStackTrace();
         } catch (Exception e) {
-            notifyServiceOnError(env, service, e);
+            log.error("Error invoking onFileDelete handler for file: {}", deletedFile, e);
         }
     }
 
