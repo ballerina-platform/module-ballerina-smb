@@ -166,6 +166,9 @@ public class SmbListenerHelper {
     public static final String LISTENER_NOT_INITIALIZED_ERROR = "Listener is not initialized";
     public static final String ENDPOINT_CONFIG_CSV_FAIL_SAFE = "csvFailSafe";
     public static final String ENDPOINT_CONFIG_LAX_DATA_BINDING = "laxDataBinding";
+    public static final BString SIZE = StringUtils.fromString("size");
+    public static final String DOT_IDENTIFIER = ".";
+    public static final String DOUBLE_DOT_IDENTIFIER = "..";
 
     private SmbListenerHelper() {
     }
@@ -458,7 +461,7 @@ public class SmbListenerHelper {
         List<FileIdBothDirectoryInformation> files = diskShare.list(listPath);
         for (FileIdBothDirectoryInformation fileInfo : files) {
             String fileName = fileInfo.getFileName();
-            if (".".equals(fileName) || "..".equals(fileName)) {
+            if (DOT_IDENTIFIER.equals(fileName) || DOUBLE_DOT_IDENTIFIER.equals(fileName)) {
                 continue;
             }
             boolean isFolder = EnumWithValue.EnumUtils.isSet(
@@ -494,7 +497,7 @@ public class SmbListenerHelper {
 
         fileInfoRecord.put(NAME, StringUtils.fromString(fileName));
         fileInfoRecord.put(PATH, StringUtils.fromString(fullPath));
-        fileInfoRecord.put(StringUtils.fromString("size"), fileInfo.getEndOfFile());
+        fileInfoRecord.put(SIZE, fileInfo.getEndOfFile());
         fileInfoRecord.put(MODIFIED_AT, createUtcTuple(fileInfo.getChangeTime().toEpochMillis()));
         fileInfoRecord.put(CREATED_AT, createUtcTuple(fileInfo.getCreationTime().toEpochMillis()));
         fileInfoRecord.put(ACCESSED_AT, createUtcTuple(fileInfo.getLastAccessTime().toEpochMillis()));
