@@ -257,7 +257,7 @@ smb:FileInfo[]|smb:Error listResponse = smbClient->list("<The directory path>");
 
 ### SMB listener
 
-The `smb:Listener` is used to listen to a remote SMB share location and trigger events when new files are added to or deleted from the directory. The listener supports both a generic `onFileChange` handler for file system events and format-specific content handlers (`onFileText`, `onFileJson`, `onFileXml`, `onFileCsv`, `onFile`) that automatically deserialize file content based on the file type.
+The `smb:Listener` is used to listen to a remote SMB share location and trigger events when new files are added to or deleted from the directory. The listener supports format-specific content handlers (`onFileText`, `onFileJson`, `onFileXml`, `onFileCsv`, `onFile`) that automatically deserialize file content based on the file type.
 
 An SMB listener is defined using the mandatory `host`, `share`, and `path` parameters. The authentication configuration can be done using the `auth` parameter and the polling interval can be configured using the `pollingInterval` parameter. The default polling interval is 60 seconds.
 
