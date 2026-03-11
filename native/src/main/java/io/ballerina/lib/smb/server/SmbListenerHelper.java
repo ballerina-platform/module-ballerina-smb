@@ -23,7 +23,6 @@ import com.hierynomus.msfscc.FileAttributes;
 import com.hierynomus.msfscc.fileinformation.FileIdBothDirectoryInformation;
 import com.hierynomus.mssmb2.SMB2CreateDisposition;
 import com.hierynomus.mssmb2.SMB2ShareAccess;
-import com.hierynomus.mssmb2.SMBApiException;
 import com.hierynomus.protocol.commons.EnumWithValue;
 import com.hierynomus.smbj.SMBClient;
 import com.hierynomus.smbj.auth.AuthenticationContext;
@@ -457,14 +456,9 @@ public class SmbListenerHelper {
     }
 
     private static void collectFilesRecursively(DiskShare diskShare, String path,
-                                                 Map<String, FileIdBothDirectoryInformation> result) {
+                                                Map<String, FileIdBothDirectoryInformation> result) {
         String listPath = path.startsWith(SLASH_SUFFIX) ? path.substring(1) : path;
-        List<FileIdBothDirectoryInformation> files;
-        try {
-            files = diskShare.list(listPath);
-        } catch (SMBApiException e) {
-            throw new RuntimeException("Failed to list files for path: " + path + ". " + e.getMessage(), e);
-        }
+        List<FileIdBothDirectoryInformation> files = diskShare.list(listPath);
         for (FileIdBothDirectoryInformation fileInfo : files) {
             String fileName = fileInfo.getFileName();
             if (DOT_IDENTIFIER.equals(fileName) || DOUBLE_DOT_IDENTIFIER.equals(fileName)) {
