@@ -601,12 +601,10 @@ public class SmbListenerHelper {
             Object result = env.getRuntime().callMethod(service, ON_FILE_DELETE,
                     new StrandMetadata(true, null), args.toArray());
             if (result instanceof BError) {
-                ((BError) result).printStackTrace();
+                notifyServiceOnError(env, service, new Exception(((BError) result).getErrorMessage().getValue()));
             }
-        } catch (BError error) {
-            error.printStackTrace();
         } catch (Exception e) {
-            log.error("Error invoking onFileDelete handler for file: {}", deletedFile, e);
+            notifyServiceOnError(env, service, e);
         }
     }
 
