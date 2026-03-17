@@ -56,8 +56,6 @@ import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BObject;
 import io.ballerina.runtime.api.values.BString;
 import io.ballerina.runtime.api.values.BTypedesc;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -124,7 +122,6 @@ public class SmbClient {
     public static final String DIALECT_SMB_2_1 = "SMB_2_1";
     public static final String DIALECT_SMB_2_0_2 = "SMB_2_0_2";
     public static final String WRITE_OPTION_APPEND = "APPEND";
-    private static final Logger log = LoggerFactory.getLogger(SmbClient.class);
     private static final String CLIENT_CLOSED_ERROR_MESSAGE =
             "SMB Client is already closed, hence further operations are not allowed";
     private static final String ON_CLOSE_ERROR = "Error occurred while closing the SMB client: ";
@@ -252,8 +249,6 @@ public class SmbClient {
             clientEndpoint.addNativeData(SMB_CONNECTION, connection);
             clientEndpoint.addNativeData(SMB_SESSION, session);
             clientEndpoint.addNativeData(SMB_SHARE, diskShare);
-
-            log.debug("SMB client initialized successfully for host: {} share: {}", host, share);
             return null;
         } catch (Exception exception) {
             return SmbUtil.createError(CLIENT_INITIALIZATION_ERROR + exception.getMessage(), SMB_ERROR);
@@ -326,7 +321,6 @@ public class SmbClient {
                         TypeCreator.createRecordType(FILE_INFO_TYPE, ModuleUtils.getModule(), 0, false, 0));
                 BArray fileInfoArray = ValueCreator.createArrayValue(
                         fileInfoList.toArray(new BMap[0]), arrayType);
-                log.debug("Listed {} items in directory: {}", fileInfoList.size(), directoryPath);
                 return fileInfoArray;
             } catch (Exception e) {
                 return SmbUtil.createError("Failed to list directory: " + e.getMessage(), SMB_ERROR);
@@ -672,7 +666,6 @@ public class SmbClient {
                 options.put("storeKey", "true");
                 options.put("doNotPrompt", "true");
                 options.put("principal", principal);
-                options.put("debug", String.valueOf(log.isDebugEnabled()));
 
                 return new AppConfigurationEntry[]{
                         new AppConfigurationEntry("com.sun.security.auth.module.Krb5LoginModule",
@@ -695,7 +688,6 @@ public class SmbClient {
                 options.put("renewTGT", "false");
                 options.put("doNotPrompt", "false");
                 options.put("storeKey", "true");
-                options.put("debug", String.valueOf(log.isDebugEnabled()));
 
                 return new AppConfigurationEntry[]{
                         new AppConfigurationEntry(
@@ -732,7 +724,6 @@ public class SmbClient {
                 options.put("doNotPrompt", "true");
                 options.put("storeKey", "false");
                 options.put("principal", principal);
-                options.put("debug", String.valueOf(log.isDebugEnabled()));
 
                 return new AppConfigurationEntry[]{
                         new AppConfigurationEntry(
