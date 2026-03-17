@@ -61,6 +61,8 @@ import io.ballerina.runtime.api.values.BError;
 import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BObject;
 import io.ballerina.runtime.api.values.BString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -106,6 +108,7 @@ import static io.ballerina.lib.smb.client.SmbClient.WRITTEN_AT;
  */
 public class SmbListenerHelper {
     private static final int ARRAY_SIZE = 65536;
+    private static final Logger log = LoggerFactory.getLogger(SmbListenerHelper.class);
     private static final Set<String> EXECUTABLE_EXTENSIONS = Set.of(
             "exe", "bat", "cmd", "com", "msi", "ps1", "vbs", "wsf", "jar"
     );
@@ -274,9 +277,9 @@ public class SmbListenerHelper {
     }
 
     public static Object cleanup(BObject listenerEndpoint) {
+        closeExistingResources(listenerEndpoint);
         List<SmbService> services =
             (List<SmbService>) listenerEndpoint.getNativeData(LISTENER_SERVICES);
-        closeExistingResources(listenerEndpoint, null, services);
         if (services != null) {
             services.clear();
         }
@@ -290,10 +293,11 @@ public class SmbListenerHelper {
 
     private static void checkForFileChanges(Environment env, BObject listenerEndpoint,
                                             BMap<BString, Object> config) throws Exception {
+        DiskShare diskShare = getOrCreateDiskShare(listenerEndpoint, config);
         List<SmbService> services =
                 (List<SmbService>) listenerEndpoint.getNativeData(LISTENER_SERVICES);
-        DiskShare diskShare = getOrCreateDiskShare(listenerEndpoint, config, env, services);
         if (services == null || services.isEmpty()) {
+            log.debug("No services registered");
             return;
         }
         Set<String> pathsToMonitor = new HashSet<>();
@@ -306,14 +310,13 @@ public class SmbListenerHelper {
     }
 
     private static DiskShare getOrCreateDiskShare(BObject listenerEndpoint,
-                                                   BMap<BString, Object> config, Environment env,
-                                                   List<SmbService> services) throws Exception {
+                                                   BMap<BString, Object> config) throws Exception {
         DiskShare existingShare = (DiskShare) listenerEndpoint.getNativeData(LISTENER_DISK_SHARE);
         Connection existingConnection = (Connection) listenerEndpoint.getNativeData(LISTENER_CONNECTION);
         if (existingShare != null && existingConnection != null && existingConnection.isConnected()) {
             return existingShare;
         }
-        closeExistingResources(listenerEndpoint, env, services);
+        closeExistingResources(listenerEndpoint);
         String host = config.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_HOST)).getValue();
         String share = config.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_SHARE)).getValue();
         int port = config.getIntValue(StringUtils.fromString(ENDPOINT_CONFIG_PORT)).intValue();
@@ -375,30 +378,27 @@ public class SmbListenerHelper {
         );
     }
 
-    private static void closeExistingResources(BObject listenerEndpoint, Environment env,
-                                                List<SmbService> services) {
+    private static void closeExistingResources(BObject listenerEndpoint) {
         DiskShare diskShare = (DiskShare) listenerEndpoint.getNativeData(LISTENER_DISK_SHARE);
         Session session = (Session) listenerEndpoint.getNativeData(LISTENER_SESSION);
         Connection connection = (Connection) listenerEndpoint.getNativeData(LISTENER_CONNECTION);
         SMBClient smbClient = (SMBClient) listenerEndpoint.getNativeData(LISTENER_SMB_CLIENT);
-        closeResource(diskShare, env, services);
-        closeResource(session, env, services);
-        closeResource(connection, env, services);
-        closeResource(smbClient, env, services);
+        closeQuietly(diskShare);
+        closeQuietly(session);
+        closeQuietly(connection);
+        closeQuietly(smbClient);
         listenerEndpoint.addNativeData(LISTENER_DISK_SHARE, null);
         listenerEndpoint.addNativeData(LISTENER_SESSION, null);
         listenerEndpoint.addNativeData(LISTENER_CONNECTION, null);
         listenerEndpoint.addNativeData(LISTENER_SMB_CLIENT, null);
     }
 
-    private static void closeResource(AutoCloseable closeable, Environment env, List<SmbService> services) {
+    private static void closeQuietly(AutoCloseable closeable) {
         if (closeable != null) {
             try {
                 closeable.close();
             } catch (Exception e) {
-                if (env != null && services != null) {
-                    notifyServicesOnError(env, services, e);
-                }
+                log.debug("Error closing resource: {}", e.getMessage());
             }
         }
     }
@@ -593,8 +593,7 @@ public class SmbListenerHelper {
         try {
             Parameter[] parameters = method.getParameters();
             if (parameters.length < 1) {
-                notifyServiceOnError(env, service,
-                        new Exception("Content handler " + methodName + " has no parameters"));
+                log.error("Content handler {} has no parameters", methodName);
                 return;
             }
 
@@ -602,8 +601,7 @@ public class SmbListenerHelper {
             Object content = readFileContent(env, diskShare, filePath, methodName, contentParamType, listenerConfig);
 
             if (TypeUtils.getType(content).getTag() == TypeTags.ERROR_TAG) {
-                notifyServiceOnError(env, service,
-                        new Exception(((BError) content).getErrorMessage().getValue()));
+                log.error("Error reading file content: {}", ((BError) content).getErrorMessage().getValue());
                 return;
             }
             List<Object> args = new ArrayList<>();
@@ -622,8 +620,9 @@ public class SmbListenerHelper {
                 }
             }
             env.getRuntime().callMethod(service, methodName, null, args.toArray());
+            log.debug("Successfully invoked {} for file: {}", methodName, filePath);
         } catch (Exception e) {
-            notifyServiceOnError(env, service, e);
+            log.error("Error invoking content handler {} for file: {}", methodName, filePath, e);
         }
     }
 
@@ -848,7 +847,7 @@ public class SmbListenerHelper {
                     null);
             env.getRuntime().callMethod(service, ON_ERROR_METHOD, new StrandMetadata(true, null), bError);
         } catch (Exception exception) {
-            // Ignore if triggering onError fails 
+            log.debug("Service does not implement 'onError' or error invoking 'onError': {}", exception.getMessage());
         }
     }
 
@@ -870,8 +869,8 @@ public class SmbListenerHelper {
         for (SmbService registration : services) {
             try {
                 env.getRuntime().callMethod(registration.service(), ON_ERROR_METHOD, null, bError);
-            } catch (Exception ignored) {
-                // Ignore if triggering onError fails 
+            } catch (Exception ex) {
+                log.debug("Service does not implement onError or error invoking onError: {}", ex.getMessage());
             }
         }
     }
@@ -896,6 +895,7 @@ public class SmbListenerHelper {
                     ? loginWithPassword(principal, password)
                     : loginWithTicketCache(principal);
 
+            log.debug("Using Kerberos authentication for principal: {}", principal);
             return new GSSAuthenticationContext(kerberosUsername, realm, subject, null);
         } catch (Exception e) {
             throw new RuntimeException(KERBEROS_AUTH_CONTEXT_ERROR + e.getMessage(), e);
@@ -919,6 +919,7 @@ public class SmbListenerHelper {
                 options.put("storeKey", "true");
                 options.put("doNotPrompt", "true");
                 options.put("principal", principal);
+                options.put("debug", String.valueOf(log.isDebugEnabled()));
 
                 return new AppConfigurationEntry[]{
                         new AppConfigurationEntry("com.sun.security.auth.module.Krb5LoginModule",
@@ -929,6 +930,7 @@ public class SmbListenerHelper {
         };
         LoginContext loginContext = new LoginContext("SmbKerberosListener", null, null, jaasConfig);
         loginContext.login();
+        log.debug("Kerberos login with keytab successful for principal: {}", principal);
         return loginContext.getSubject();
     }
 
@@ -941,6 +943,7 @@ public class SmbListenerHelper {
                 options.put("renewTGT", "false");
                 options.put("doNotPrompt", "false");
                 options.put("storeKey", "true");
+                options.put("debug", String.valueOf(log.isDebugEnabled()));
 
                 return new AppConfigurationEntry[]{
                         new AppConfigurationEntry(
@@ -964,6 +967,7 @@ public class SmbListenerHelper {
 
         LoginContext loginContext = new LoginContext("SmbKerberosListener", null, callbackHandler, jaasConfig);
         loginContext.login();
+        log.debug("Kerberos login with password successful for principal: {}", principal);
         return loginContext.getSubject();
     }
 
@@ -977,6 +981,7 @@ public class SmbListenerHelper {
                 options.put("doNotPrompt", "true");
                 options.put("storeKey", "false");
                 options.put("principal", principal);
+                options.put("debug", String.valueOf(log.isDebugEnabled()));
 
                 return new AppConfigurationEntry[]{
                         new AppConfigurationEntry(
@@ -990,6 +995,7 @@ public class SmbListenerHelper {
 
         LoginContext loginContext = new LoginContext("SmbKerberosListener", null, null, jaasConfig);
         loginContext.login();
+        log.debug("Kerberos login with ticket cache successful for principal: {}", principal);
         return loginContext.getSubject();
     }
 

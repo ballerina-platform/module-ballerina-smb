@@ -33,6 +33,8 @@ import io.ballerina.runtime.api.values.BError;
 import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BString;
 import io.ballerina.runtime.api.values.BTypedesc;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -45,6 +47,7 @@ import static io.ballerina.lib.smb.client.SmbClient.SMB_ERROR;
  */
 public final class SmbContentConverter {
 
+    private static final Logger log = LoggerFactory.getLogger(SmbContentConverter.class);
     public static final String CURRENT_DIRECTORY_PATH = System.getProperty("user.dir");
     public static final String ERROR_LOG_FILE_NAME = "error.log";
     public static final BString APPEND = StringUtils.fromString("APPEND");
