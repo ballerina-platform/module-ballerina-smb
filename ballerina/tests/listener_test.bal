@@ -1323,7 +1323,7 @@ function testOnFileStreamWithCaller() returns error? {
     test:assertTrue(callerStreamCounter >= 1, "onFile stream with Caller should be triggered");
     test:assertTrue(callerStreamBytes >= 10000, "Stream should process all bytes");
     test:assertTrue(callerStreamUsed, "Caller should be used successfully");
-    
+
     // Verify the response file was created
     byte[]|Error responseContent = smbClient->getBytes("/caller_tests/stream_response.txt");
     test:assertTrue(responseContent is byte[], "Response file should exist");
@@ -1331,4 +1331,144 @@ function testOnFileStreamWithCaller() returns error? {
         string responseText = check string:fromBytes(responseContent);
         test:assertTrue(responseText.includes("Stream processed"), "Response should contain expected text");
     }
+}
+
+int onFileDeleteCounter = 0;
+string[] capturedDeletedFilesIndividual = [];
+
+int onDeleteWithCallerCounter = 0;
+boolean onDeleteCallerUsed = false;
+string? onDeleteCallerFile = ();
+
+Service onFileDeleteService = service object {
+    remote function onFileDelete(string deletedFile) returns error? {
+        io:println("onFileDelete triggered for: ", deletedFile);
+        onFileDeleteCounter += 1;
+        capturedDeletedFilesIndividual.push(deletedFile);
+    }
+
+    remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
+        io:println("File added: ", fileInfo.name);
+    }
+
+    function onError(error err) returns error? {
+        io:println("onFileDelete service error: ", err.message());
+    }
+};
+
+Service onDeleteWithCallerService = service object {
+    remote function onFileDelete(string deletedFile, Caller caller) returns error? {
+        io:println("onFileDelete with Caller triggered for: ", deletedFile);
+        onDeleteWithCallerCounter += 1;
+        onDeleteCallerFile = deletedFile;
+        FileInfo[]|error remainingFiles = caller->list("/delete_tests");
+        onDeleteCallerUsed = remainingFiles is FileInfo[];
+    }
+
+    remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
+        io:println("File added: ", fileInfo.name);
+    }
+
+    function onError(error err) returns error? {
+        io:println("onDeleteWithCaller service error: ", err.message());
+    }
+};
+
+@test:Config {
+    groups: ["listener", "onDelete"],
+    dependsOn: [testOnFileStreamWithCaller]
+}
+function testOnFileDeleteSingleFile() returns error? {
+    onFileDeleteCounter = 0;
+    capturedDeletedFilesIndividual = [];
+
+    check smbClient->mkdir("/delete_tests");
+
+    Listener deleteListener = check new ({
+        host: "localhost",
+        port: 445,
+        auth: {
+            credentials: {
+                username: "testuser",
+                password: "testpass"
+            }
+        },
+        share: "testshare",
+        pollingInterval: 2,
+        bufferSize: 65536
+    });
+
+    check deleteListener.attach(onFileDeleteService, "delete_tests");
+    check deleteListener.'start();
+    runtime:registerListener(deleteListener);
+    runtime:sleep(3);
+    onFileDeleteCounter = 0;
+    capturedDeletedFilesIndividual = [];
+    error? putResult = smbClient->putText("/delete_tests/file_to_delete.txt", "Content to delete");
+    test:assertEquals(putResult, ());
+    runtime:sleep(3);
+    error? deleteResult = smbClient->delete("/delete_tests/file_to_delete.txt");
+    test:assertEquals(deleteResult, ());
+    runtime:sleep(5);
+    check deleteListener.immediateStop();
+    test:assertTrue(onFileDeleteCounter >= 1, "onFileDelete should be triggered at least once");
+    test:assertTrue(capturedDeletedFilesIndividual.length() >= 1, "At least one deleted file should be captured");
+}
+
+@test:Config {
+    groups: ["listener", "onDelete"],
+    dependsOn: [testOnFileDeleteSingleFile]
+}
+function testOnFileDeleteWithCaller() returns error? {
+    onDeleteWithCallerCounter = 0;
+    onDeleteCallerUsed = false;
+    onDeleteCallerFile = ();
+
+    boolean exists = check smbClient->exists("/delete_tests");
+    if !exists {
+        check smbClient->mkdir("/delete_tests");
+    }
+
+    Listener deleteCallerListener = check new ({
+        host: "localhost",
+        port: 445,
+        auth: {
+            credentials: {
+                username: "testuser",
+                password: "testpass"
+            }
+        },
+        share: "testshare",
+        pollingInterval: 2,
+        bufferSize: 65536
+    });
+
+    check deleteCallerListener.attach(onDeleteWithCallerService, "delete_tests");
+    check deleteCallerListener.'start();
+    runtime:registerListener(deleteCallerListener);
+
+    // Wait for initial polling
+    runtime:sleep(3);
+
+    // Reset counters
+    onDeleteWithCallerCounter = 0;
+    onDeleteCallerUsed = false;
+    onDeleteCallerFile = ();
+
+    // Create a file
+    check smbClient->putText("/delete_tests/caller_test_file.txt", "Content for caller test");
+
+    // Wait for file detection
+    runtime:sleep(3);
+
+    // Delete the file
+    check smbClient->delete("/delete_tests/caller_test_file.txt");
+
+    // Wait for deletion detection
+    runtime:sleep(5);
+
+    check deleteCallerListener.immediateStop();
+
+    test:assertTrue(onDeleteWithCallerCounter >= 1, "onFileDelete with Caller should be triggered");
+    test:assertTrue(onDeleteCallerUsed, "Caller should be used successfully in onFileDelete");
 }

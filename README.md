@@ -257,7 +257,7 @@ smb:FileInfo[]|smb:Error listResponse = smbClient->list("<The directory path>");
 
 ### SMB listener
 
-The `smb:Listener` is used to listen to a remote SMB share location and trigger events when new files are added to or deleted from the directory. The listener supports both a generic `onFileChange` handler for file system events and format-specific content handlers (`onFileText`, `onFileJson`, `onFileXml`, `onFileCsv`, `onFile`) that automatically deserialize file content based on the file type.
+The `smb:Listener` is used to listen to a remote SMB share location and trigger events when new files are added to or deleted from the directory. The listener supports format-specific content handlers (`onFileText`, `onFileJson`, `onFileXml`, `onFileCsv`, `onFile`) that automatically deserialize file content based on the file type, and an `onFileDelete` handler for deletion events.
 
 An SMB listener is defined using the mandatory `host`, `share`, and `path` parameters. The authentication configuration can be done using the `auth` parameter and the polling interval can be configured using the `pollingInterval` parameter. The default polling interval is 60 seconds.
 
@@ -398,9 +398,33 @@ service on remoteServer {
 }
 ```
 
+**Handle deleted files:**
+
+The `onFileDelete` handler is invoked when a file is removed from the watched directory. It receives the path of the deleted file as a `string`. Since the file no longer exists at the time the handler is called, no file content or `smb:FileInfo` is provided.
+
+```ballerina
+service on remoteServer {
+    remote function onFileDelete(string deletedFile) returns error? {
+        log:printInfo("File deleted: " + deletedFile);
+    }
+}
+```
+
+The `onFileDelete` handler also supports an optional `smb:Caller` parameter, which allows performing SMB operations from within the handler (e.g., logging the deletion to another file or cleaning up related resources):
+
+```ballerina
+service on remoteServer {
+    remote function onFileDelete(string deletedFile, smb:Caller caller) returns error? {
+        log:printInfo("File deleted: " + deletedFile);
+        // Log the deletion event to an audit file
+        check caller->putText("/audit/deletions.log", deletedFile + " was deleted\n");
+    }
+}
+```
+
 #### SMB Caller
 
-All content handler methods (`onFileText`, `onFileJson`, `onFileXml`, `onFileCsv`, `onFile`) support an optional `smb:Caller` parameter. The `Caller` object provides access to the SMB client, allowing you to perform operations on the SMB share from within the handler (e.g., writing response files, moving processed files, or reading related files).
+All content handler methods (`onFileText`, `onFileJson`, `onFileXml`, `onFileCsv`, `onFile`) and the `onFileDelete` handler support an optional `smb:Caller` parameter. The `Caller` object provides access to the SMB client, allowing you to perform operations on the SMB share from within the handler (e.g., writing response files, moving processed files, or reading related files).
 
 ```ballerina
 service on remoteServer {
