@@ -37,7 +37,6 @@ import io.ballerina.lib.smb.util.ModuleUtils;
 import io.ballerina.lib.smb.util.SmbContentConverter;
 import io.ballerina.lib.smb.util.SmbUtil;
 import io.ballerina.runtime.api.Environment;
-import io.ballerina.runtime.api.Module;
 import io.ballerina.runtime.api.concurrent.StrandMetadata;
 import io.ballerina.runtime.api.creators.ErrorCreator;
 import io.ballerina.runtime.api.creators.TypeCreator;
@@ -55,18 +54,14 @@ import io.ballerina.runtime.api.types.TypeTags;
 import io.ballerina.runtime.api.utils.JsonUtils;
 import io.ballerina.runtime.api.utils.StringUtils;
 import io.ballerina.runtime.api.utils.TypeUtils;
-import io.ballerina.runtime.api.utils.XmlUtils;
 import io.ballerina.runtime.api.values.BArray;
 import io.ballerina.runtime.api.values.BError;
 import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BObject;
 import io.ballerina.runtime.api.values.BString;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -109,7 +104,6 @@ import static io.ballerina.lib.smb.client.SmbClient.WRITTEN_AT;
  */
 public class SmbListenerHelper {
     private static final int ARRAY_SIZE = 65536;
-    private static final Logger log = LoggerFactory.getLogger(SmbListenerHelper.class);
     private static final Set<String> EXECUTABLE_EXTENSIONS = Set.of(
             "exe", "bat", "cmd", "com", "msi", "ps1", "vbs", "wsf", "jar"
     );
@@ -142,6 +136,8 @@ public class SmbListenerHelper {
     private static final String ON_FILE = "onFile";
     private static final String ON_FILE_DELETE = "onFileDelete";
     private static final String EXT_TXT = "txt";
+    private static final String EXT_LOG = "log";
+    private static final String EXT_MD = "md";
     private static final String EXT_JSON = "json";
     private static final String EXT_XML = "xml";
     private static final String EXT_CSV = "csv";
@@ -149,6 +145,11 @@ public class SmbListenerHelper {
     private static final String SERVICE_CONFIG = "ServiceConfig";
     private static final String PATH_KEY = "path";
     private static final String FILE_NAME_PATTERN = "fileNamePattern";
+    private static final String AFTER_PROCESS = "afterProcess";
+    private static final String AFTER_ERROR = "afterError";
+    private static final String MOVE_TO = "moveTo";
+    private static final String PRESERVE_SUB_DIRS = "preserveSubDirs";
+    private static final String DELETE_VALUE = "DELETE";
     private static final String FILE_INFO = "FileInfo";
     public static final String INITIALIZE_SMB_LISTENER_ERROR = "Failed to initialize SMB listener: ";
     public static final String DEREGISTER_SERVICE_ERROR = "Failed to deregister service: ";
@@ -171,6 +172,16 @@ public class SmbListenerHelper {
     public static final String DOUBLE_DOT_IDENTIFIER = "..";
 
     private SmbListenerHelper() {
+    }
+
+    private record PostProcessAction(boolean isDelete, String moveTo, boolean preserveSubDirs) {
+        static PostProcessAction delete() {
+            return new PostProcessAction(true, null, false);
+        }
+
+        static PostProcessAction move(String moveTo, boolean preserveSubDirs) {
+            return new PostProcessAction(false, moveTo, preserveSubDirs);
+        }
     }
 
     private static boolean isExecutableFile(String fileName) {
@@ -281,7 +292,7 @@ public class SmbListenerHelper {
         });
     }
 
-    public static Object cleanup(BObject listenerEndpoint) {
+    public static Object cleanup(BObject listenerEndpoint) throws Exception {
         closeExistingResources(listenerEndpoint);
         List<SmbService> services =
             (List<SmbService>) listenerEndpoint.getNativeData(LISTENER_SERVICES);
@@ -302,15 +313,15 @@ public class SmbListenerHelper {
         List<SmbService> services =
                 (List<SmbService>) listenerEndpoint.getNativeData(LISTENER_SERVICES);
         if (services == null || services.isEmpty()) {
-            log.debug("No services registered");
             return;
         }
+        List<SmbService> smbServices = new ArrayList<>(services);
         Set<String> pathsToMonitor = new HashSet<>();
-        for (SmbService registration : services) {
+        for (SmbService registration : smbServices) {
             pathsToMonitor.add(registration.path());
         }
         for (String path : pathsToMonitor) {
-            checkPathForChanges(env, listenerEndpoint, diskShare, path, services, config);
+            checkPathForChanges(env, listenerEndpoint, diskShare, path, smbServices, config);
         }
     }
 
@@ -383,7 +394,7 @@ public class SmbListenerHelper {
         );
     }
 
-    private static void closeExistingResources(BObject listenerEndpoint) {
+    private static void closeExistingResources(BObject listenerEndpoint) throws Exception {
         DiskShare diskShare = (DiskShare) listenerEndpoint.getNativeData(LISTENER_DISK_SHARE);
         Session session = (Session) listenerEndpoint.getNativeData(LISTENER_SESSION);
         Connection connection = (Connection) listenerEndpoint.getNativeData(LISTENER_CONNECTION);
@@ -398,13 +409,9 @@ public class SmbListenerHelper {
         listenerEndpoint.addNativeData(LISTENER_SMB_CLIENT, null);
     }
 
-    private static void closeQuietly(AutoCloseable closeable) {
+    private static void closeQuietly(AutoCloseable closeable) throws Exception {
         if (closeable != null) {
-            try {
-                closeable.close();
-            } catch (Exception e) {
-                log.debug("Error closing resource: {}", e.getMessage());
-            }
+            closeable.close();
         }
     }
 
@@ -539,7 +546,8 @@ public class SmbListenerHelper {
             for (SmbService registration : servicesToNotify) {
                 BObject service = registration.service();
                 try {
-                    tryContentHandlers(env, service, filePath, extension, fileInfo, diskShare, listenerConfig);
+                    tryContentHandlers(env, service, filePath, extension, fileInfo, diskShare,
+                            listenerConfig, changedPath);
                 } catch (Exception exception) {
                     notifyServiceOnError(env, service, exception);
                 }
@@ -592,8 +600,9 @@ public class SmbListenerHelper {
             }
         }
         try {
+            boolean isConcurrentSafe = serviceType.isIsolated() && serviceType.isIsolated(ON_FILE_DELETE);
             Object result = env.getRuntime().callMethod(service, ON_FILE_DELETE,
-                    new StrandMetadata(true, null), args.toArray());
+                    new StrandMetadata(isConcurrentSafe, null), args.toArray());
             if (result instanceof BError) {
                 notifyServiceOnError(env, service, new Exception(((BError) result).getErrorMessage().getValue()));
             }
@@ -604,29 +613,59 @@ public class SmbListenerHelper {
 
     private static void tryContentHandlers(Environment env, BObject service, String filePath,
                                            String extension, BMap<BString, Object> fileInfo,
-                                           DiskShare diskShare, BMap<BString, Object> listenerConfig) {
+                                           DiskShare diskShare, BMap<BString, Object> listenerConfig,
+                                           String servicePath) {
         ObjectType serviceType = (ObjectType) TypeUtils.getReferredType(TypeUtils.getType(service));
         String handlerMethod = getHandlerMethodForExtension(extension);
         if (handlerMethod != null && hasMethod(serviceType, handlerMethod)) {
             MethodType method = getMethod(serviceType, handlerMethod);
             if (method != null && matchesFilePattern(method, fileInfo, listenerConfig)) {
+                BMap<BString, Object> annotation = getFunctionConfigAnnotation(method);
+                PostProcessAction afterProcess = parsePostProcessAction(annotation, AFTER_PROCESS);
+                PostProcessAction afterError = parsePostProcessAction(annotation, AFTER_ERROR);
                 invokeContentHandler(env, service, method, handlerMethod, filePath, fileInfo, diskShare,
-                        listenerConfig);
+                        listenerConfig, afterProcess, afterError, servicePath);
                 return;
             }
         }
         if (hasMethod(serviceType, ON_FILE)) {
             MethodType method = getMethod(serviceType, ON_FILE);
             if (method != null && matchesFilePattern(method, fileInfo, listenerConfig)) {
+                BMap<BString, Object> annotation = getFunctionConfigAnnotation(method);
+                PostProcessAction afterProcess = parsePostProcessAction(annotation, AFTER_PROCESS);
+                PostProcessAction afterError = parsePostProcessAction(annotation, AFTER_ERROR);
                 invokeContentHandler(env, service, method, ON_FILE, filePath, fileInfo, diskShare,
-                        listenerConfig);
+                        listenerConfig, afterProcess, afterError, servicePath);
             }
         }
     }
 
+    private static BMap<BString, Object> getFunctionConfigAnnotation(MethodType method) {
+        return (BMap<BString, Object>) method.getAnnotation(
+                StringUtils.fromString(ModuleUtils.getModule().toString() + COLON + FUNCTION_CONFIG));
+    }
+
+    private static PostProcessAction parsePostProcessAction(BMap<BString, Object> annotation, String field) {
+        if (annotation == null) {
+            return null;
+        }
+        Object actionObj = annotation.get(StringUtils.fromString(field));
+        if (actionObj == null) {
+            return null;
+        }
+        if (TypeUtils.getType(actionObj).getTag() == TypeTags.STRING_TAG) {
+            return PostProcessAction.delete();
+        }
+        @SuppressWarnings("unchecked")
+        BMap<BString, Object> moveRecord = (BMap<BString, Object>) actionObj;
+        String moveTo = moveRecord.getStringValue(StringUtils.fromString(MOVE_TO)).getValue();
+        boolean preserveSubDirs = moveRecord.getBooleanValue(StringUtils.fromString(PRESERVE_SUB_DIRS));
+        return PostProcessAction.move(moveTo, preserveSubDirs);
+    }
+
     private static String getHandlerMethodForExtension(String extension) {
         return switch (extension) {
-            case EXT_TXT -> ON_FILE_TEXT;
+            case EXT_TXT, EXT_LOG, EXT_MD -> ON_FILE_TEXT;
             case EXT_JSON -> ON_FILE_JSON;
             case EXT_XML -> ON_FILE_XML;
             case EXT_CSV -> ON_FILE_CSV;
@@ -655,8 +694,7 @@ public class SmbListenerHelper {
     private static boolean matchesFilePattern(MethodType method, BMap<BString, Object> fileInfo,
                                                BMap<BString, Object> listenerConfig) {
         String pattern = null;
-        BMap<BString, Object> annotations = (BMap<BString, Object>) method.getAnnotation(
-                StringUtils.fromString(ModuleUtils.getModule().toString() + COLON + FUNCTION_CONFIG));
+        BMap<BString, Object> annotations = getFunctionConfigAnnotation(method);
         if (annotations != null) {
             BString patternValue = annotations.getStringValue(StringUtils.fromString(FILE_NAME_PATTERN));
             if (patternValue != null) {
@@ -682,40 +720,157 @@ public class SmbListenerHelper {
 
     private static void invokeContentHandler(Environment env, BObject service, MethodType method, String methodName,
                                              String filePath, BMap<BString, Object> fileInfo, DiskShare diskShare,
-                                             BMap<BString, Object> listenerConfig) {
+                                             BMap<BString, Object> listenerConfig, PostProcessAction afterProcess,
+                                             PostProcessAction afterError, String servicePath) {
+        Parameter[] parameters = method.getParameters();
+        if (parameters.length < 1) {
+            return;
+        }
+
+        Type contentParamType = parameters[0].type;
+        Object content;
         try {
-            Parameter[] parameters = method.getParameters();
-            if (parameters.length < 1) {
-                log.error("Content handler {} has no parameters", methodName);
-                return;
+            content = readFileContent(env, diskShare, filePath, methodName, contentParamType, listenerConfig);
+        } catch (Exception e) {
+            notifyServiceOnError(env, service, e);
+            return;
+        }
+
+        if (content == null || content instanceof BError
+                || TypeUtils.getType(content).getTag() == TypeTags.ERROR_TAG) {
+            if (content instanceof BError bError) {
+                notifyServiceOnError(env, service, new Exception(bError.getErrorMessage().getValue()));
             }
+            return;
+        }
+        List<Object> args = new ArrayList<>();
+        args.add(content);
+        for (int i = 1; i < parameters.length; i++) {
+            Type paramType = TypeUtils.getReferredType(parameters[i].type);
+            String paramTypeName = paramType.getName();
 
-            Type contentParamType = parameters[0].type;
-            Object content = readFileContent(env, diskShare, filePath, methodName, contentParamType, listenerConfig);
-
-            if (TypeUtils.getType(content).getTag() == TypeTags.ERROR_TAG) {
-                log.error("Error reading file content: {}", ((BError) content).getErrorMessage().getValue());
-                return;
-            }
-            List<Object> args = new ArrayList<>();
-            args.add(content);
-            for (int i = 1; i < parameters.length; i++) {
-                Type paramType = TypeUtils.getReferredType(parameters[i].type);
-                String paramTypeName = paramType.getName();
-
-                if (FILE_INFO.equals(paramTypeName)) {
-                    args.add(fileInfo);
-                } else if (CALLER.equals(paramTypeName)) {
-                    BObject caller = createCaller(listenerConfig);
-                    if (caller != null) {
-                        args.add(caller);
-                    }
+            if (FILE_INFO.equals(paramTypeName)) {
+                args.add(fileInfo);
+            } else if (CALLER.equals(paramTypeName)) {
+                BObject caller = createCaller(listenerConfig);
+                if (caller != null) {
+                    args.add(caller);
                 }
             }
-            env.getRuntime().callMethod(service, methodName, null, args.toArray());
-            log.debug("Successfully invoked {} for file: {}", methodName, filePath);
+        }
+        final Object[] methodArgs = args.toArray();
+        final ObjectType serviceType = (ObjectType) TypeUtils.getReferredType(TypeUtils.getType(service));
+        final boolean isConcurrentSafe = serviceType.isIsolated() && serviceType.isIsolated(methodName);
+        Thread.startVirtualThread(() -> {
+            boolean isSuccess = false;
+            try {
+                Object result = env.getRuntime().callMethod(service, methodName,
+                        new StrandMetadata(isConcurrentSafe, null), methodArgs);
+                if (result instanceof BError bError) {
+                    notifyServiceOnError(env, service, new Exception(bError.getErrorMessage().getValue()));
+                    if (afterError != null) {
+                        executePostProcessAction(afterError, filePath, diskShare, servicePath);
+                    }
+                } else {
+                    isSuccess = true;
+                }
+            } catch (Exception e) {
+                notifyServiceOnError(env, service, e);
+                if (afterError != null) {
+                    executePostProcessAction(afterError, filePath, diskShare, servicePath);
+                }
+            }
+            if (isSuccess && afterProcess != null) {
+                executePostProcessAction(afterProcess, filePath, diskShare, servicePath);
+            }
+        });
+    }
+
+    private static void executePostProcessAction(PostProcessAction action, String filePath,
+                                                  DiskShare diskShare, String servicePath) {
+        String normalizedPath = filePath.startsWith(SLASH_SUFFIX) ? filePath.substring(1) : filePath;
+        try {
+            if (action.isDelete()) {
+                executeDeleteAction(diskShare, normalizedPath);
+            } else {
+                executeMoveAction(diskShare, normalizedPath, filePath, action, servicePath);
+            }
         } catch (Exception e) {
-            log.error("Error invoking content handler {} for file: {}", methodName, filePath, e);
+            // Post-processing failures are non-fatal; log via stack trace
+            new RuntimeException("Post-processing action failed for file: " + filePath + " - " + e.getMessage(),
+                    e).printStackTrace();
+        }
+    }
+
+    private static void executeDeleteAction(DiskShare diskShare, String normalizedPath) {
+        diskShare.rm(normalizedPath);
+    }
+
+    private static void executeMoveAction(DiskShare diskShare, String normalizedPath, String filePath,
+                                          PostProcessAction action, String servicePath) throws Exception {
+        String destinationPath = calculateMoveDestination(filePath, servicePath, action);
+        String normalizedDest = destinationPath.startsWith(SLASH_SUFFIX)
+                ? destinationPath.substring(1) : destinationPath;
+        ensureDirectoryExists(diskShare, normalizedDest);
+        Set<AccessMask> accessMask = new HashSet<>();
+        accessMask.add(AccessMask.DELETE);
+        accessMask.add(AccessMask.GENERIC_WRITE);
+        accessMask.add(AccessMask.GENERIC_READ);
+        try (File file = diskShare.openFile(normalizedPath, accessMask, null,
+                SMB2ShareAccess.ALL, SMB2CreateDisposition.FILE_OPEN, null)) {
+            file.rename(normalizedDest, false);
+        }
+    }
+
+    private static String calculateMoveDestination(String filePath, String servicePath, PostProcessAction action) {
+        String moveTo = action.moveTo();
+        String fileName = filePath.contains(SLASH_SUFFIX)
+                ? filePath.substring(filePath.lastIndexOf(SLASH_SUFFIX) + 1)
+                : filePath;
+        if (!action.preserveSubDirs() || servicePath == null || servicePath.isEmpty()) {
+            return ensureTrailingSlash(moveTo) + fileName;
+        }
+        String normalizedServicePath = ensureTrailingSlash(normalizePath(servicePath));
+        String normalizedFilePath = filePath.startsWith(SLASH_SUFFIX) ? filePath : SLASH_SUFFIX + filePath;
+        if (normalizedFilePath.startsWith(normalizedServicePath)) {
+            String relativePath = normalizedFilePath.substring(normalizedServicePath.length());
+            return ensureTrailingSlash(moveTo) + (relativePath.isEmpty() ? fileName : relativePath);
+        }
+        return ensureTrailingSlash(moveTo) + fileName;
+    }
+
+    private static String ensureTrailingSlash(String path) {
+        if (path == null || path.isEmpty()) {
+            return SLASH_SUFFIX;
+        }
+        return path.endsWith(SLASH_SUFFIX) ? path : path + SLASH_SUFFIX;
+    }
+
+    private static void ensureDirectoryExists(DiskShare diskShare, String fileDest) {
+        String dirPath = fileDest.contains("/")
+                ? fileDest.substring(0, fileDest.lastIndexOf('/'))
+                : "";
+        if (dirPath.isEmpty()) {
+            return;
+        }
+        String[] parts = dirPath.split("/");
+        StringBuilder current = new StringBuilder();
+        for (String part : parts) {
+            if (part.isEmpty()) {
+                continue;
+            }
+            if (current.length() > 0) {
+                current.append('/');
+            }
+            current.append(part);
+            String dirToCreate = current.toString();
+            try {
+                if (!diskShare.folderExists(dirToCreate)) {
+                    diskShare.mkdir(dirToCreate);
+                }
+            } catch (Exception e) {
+                // Directory may have been created concurrently; ignore
+            }
         }
     }
 
@@ -755,7 +910,7 @@ public class SmbListenerHelper {
             }
             return readFileContentAsBytes(env, diskShare, normalizedPath, methodName, contentParamType,
                     listenerConfig, filePath);
-        } catch (IOException e) {
+        } catch (Exception e) {
             return SmbUtil.createError(FILE_READ_ERROR + e.getMessage(), SMB_ERROR);
         }
     }
@@ -763,7 +918,7 @@ public class SmbListenerHelper {
     private static Object readFileContentAsBytes(Environment env, DiskShare diskShare, String normalizedPath,
                                                   String methodName, Type contentParamType,
                                                   BMap<BString, Object> listenerConfig, String filePath)
-            throws IOException {
+            throws Exception {
         Set<AccessMask> accessMask = new HashSet<>();
         accessMask.add(AccessMask.GENERIC_READ);
         try (File file = diskShare.openFile(normalizedPath, accessMask, null,
@@ -777,10 +932,12 @@ public class SmbListenerHelper {
             }
             byte[] bytes = outputStream.toByteArray();
 
+            boolean laxDataBinding = listenerConfig != null &&
+                    listenerConfig.getBooleanValue(StringUtils.fromString(ENDPOINT_CONFIG_LAX_DATA_BINDING));
             return switch (methodName) {
                 case ON_FILE_TEXT -> StringUtils.fromString(new String(bytes, StandardCharsets.UTF_8));
-                case ON_FILE_JSON -> parseJsonContent(bytes, contentParamType);
-                case ON_FILE_XML -> parseXmlContent(bytes, contentParamType);
+                case ON_FILE_JSON -> parseJsonContent(bytes, contentParamType, laxDataBinding);
+                case ON_FILE_XML -> parseXmlContent(bytes, contentParamType, laxDataBinding);
                 case ON_FILE_CSV -> parseCsvContent(env, bytes, contentParamType, listenerConfig, filePath);
                 case ON_FILE -> parseByteContent(bytes, contentParamType);
                 default -> ValueCreator.createArrayValue(bytes);
@@ -788,40 +945,20 @@ public class SmbListenerHelper {
         }
     }
 
-    private static Object parseJsonContent(byte[] bytes, Type targetType) {
-        try {
-            String jsonString = new String(bytes, StandardCharsets.UTF_8);
-            return JsonUtils.parse(jsonString);
-        } catch (Exception e) {
-            return SmbUtil.createError(JSON_PARSE_ERROR + e.getMessage(), SMB_ERROR);
+    private static Object parseJsonContent(byte[] bytes, Type targetType, boolean laxDataBinding) {
+        Type referredType = TypeUtils.getReferredType(targetType);
+        if (referredType.getTag() == TypeTags.JSON_TAG || referredType.getTag() == TypeTags.MAP_TAG) {
+            try {
+                return JsonUtils.parse(new String(bytes, StandardCharsets.UTF_8));
+            } catch (Exception e) {
+                return SmbUtil.createError(JSON_PARSE_ERROR + e.getMessage(), SMB_ERROR);
+            }
         }
+        return SmbContentConverter.convertBytesToJson(bytes, referredType, laxDataBinding);
     }
 
-    private static Object parseXmlContent(byte[] bytes, Type targetType) {
-        try {
-            Type referredType = TypeUtils.getReferredType(targetType);
-            if (referredType.getQualifiedName().equals("xml")) {
-                return XmlUtils.parse(StringUtils.fromString(new String(bytes, StandardCharsets.UTF_8)));
-            }
-            BMap<BString, Object> options = createXmlParseOptions();
-            Object result = io.ballerina.lib.data.xmldata.xml.Native.parseBytes(
-                    ValueCreator.createArrayValue(bytes), options, ValueCreator.createTypedescValue(referredType));
-            if (result instanceof BError) {
-                return SmbUtil.createError(((BError) result).getErrorMessage().getValue(), SMB_ERROR);
-            }
-            return result;
-        } catch (BError e) {
-            return SmbUtil.createError(e.getErrorMessage().getValue(), SMB_ERROR);
-        } catch (Exception e) {
-            return SmbUtil.createError(PARSE_XML_CONTENT_ERROR + e.getMessage(), SMB_ERROR);
-        }
-    }
-
-    private static BMap<BString, Object> createXmlParseOptions() {
-        BMap<BString, Object> mapValue = ValueCreator.createRecordValue(
-                new Module("ballerina", "data.xmldata", "1"), "SourceOptions");
-        mapValue.put(StringUtils.fromString("allowDataProjection"), true);
-        return mapValue;
+    private static Object parseXmlContent(byte[] bytes, Type targetType, boolean laxDataBinding) {
+        return SmbContentConverter.convertBytesToXml(bytes, TypeUtils.getReferredType(targetType), laxDataBinding);
     }
 
     private static Object parseCsvContent(Environment env, byte[] bytes, Type targetType,
@@ -979,7 +1116,6 @@ public class SmbListenerHelper {
                     ? loginWithPassword(principal, password)
                     : loginWithTicketCache(principal);
 
-            log.debug("Using Kerberos authentication for principal: {}", principal);
             return new GSSAuthenticationContext(kerberosUsername, realm, subject, null);
         } catch (Exception e) {
             throw new RuntimeException(KERBEROS_AUTH_CONTEXT_ERROR + e.getMessage(), e);
@@ -1003,7 +1139,7 @@ public class SmbListenerHelper {
                 options.put("storeKey", "true");
                 options.put("doNotPrompt", "true");
                 options.put("principal", principal);
-                options.put("debug", String.valueOf(log.isDebugEnabled()));
+                options.put("debug", "false");
 
                 return new AppConfigurationEntry[]{
                         new AppConfigurationEntry("com.sun.security.auth.module.Krb5LoginModule",
@@ -1014,7 +1150,6 @@ public class SmbListenerHelper {
         };
         LoginContext loginContext = new LoginContext("SmbKerberosListener", null, null, jaasConfig);
         loginContext.login();
-        log.debug("Kerberos login with keytab successful for principal: {}", principal);
         return loginContext.getSubject();
     }
 
@@ -1027,7 +1162,7 @@ public class SmbListenerHelper {
                 options.put("renewTGT", "false");
                 options.put("doNotPrompt", "false");
                 options.put("storeKey", "true");
-                options.put("debug", String.valueOf(log.isDebugEnabled()));
+                options.put("debug", "false");
 
                 return new AppConfigurationEntry[]{
                         new AppConfigurationEntry(
@@ -1051,7 +1186,6 @@ public class SmbListenerHelper {
 
         LoginContext loginContext = new LoginContext("SmbKerberosListener", null, callbackHandler, jaasConfig);
         loginContext.login();
-        log.debug("Kerberos login with password successful for principal: {}", principal);
         return loginContext.getSubject();
     }
 
@@ -1065,7 +1199,7 @@ public class SmbListenerHelper {
                 options.put("doNotPrompt", "true");
                 options.put("storeKey", "false");
                 options.put("principal", principal);
-                options.put("debug", String.valueOf(log.isDebugEnabled()));
+                options.put("debug", "false");
 
                 return new AppConfigurationEntry[]{
                         new AppConfigurationEntry(
@@ -1079,7 +1213,6 @@ public class SmbListenerHelper {
 
         LoginContext loginContext = new LoginContext("SmbKerberosListener", null, null, jaasConfig);
         loginContext.login();
-        log.debug("Kerberos login with ticket cache successful for principal: {}", principal);
         return loginContext.getSubject();
     }
 
