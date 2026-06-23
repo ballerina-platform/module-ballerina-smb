@@ -33,6 +33,12 @@ int afterProcessMoveCounter = 0;
 int afterErrorDeleteCounter = 0;
 int afterErrorMoveCounter = 0;
 int afterProcessMoveSubDirsCounter = 0;
+int afterProcessBinaryDeleteCounter = 0;
+int onDeleteMatchingPatternCounter = 0;
+int onDeleteNonMatchingPatternCounter = 0;
+int onDeleteListenerPatternCounter = 0;
+int afterProcessJsonDeleteCounter = 0;
+int afterErrorMoveOnFileCounter = 0;
 
 final ListenerConfiguration POST_PROCESSING_LISTENER_CONFIG = {
     host: "localhost",
@@ -405,8 +411,304 @@ function testAfterErrorMove() returns error? {
 }
 
 @test:Config {
-    groups: ["listener", "post-processing", "afterError"],
+    groups: ["listener", "post-processing", "afterProcess", "onFile"],
     dependsOn: [testAfterErrorMove]
+}
+function testAfterProcessDeleteOnBinaryFile() returns error? {
+    afterProcessBinaryDeleteCounter = 0;
+
+    Service binaryDeleteService = service object {
+        @FunctionConfig {
+            afterProcess: DELETE
+        }
+        remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
+            afterProcessBinaryDeleteCounter += 1;
+        }
+
+        function onError(error err) returns error? {
+            io:println("Binary delete service error: ", err.message());
+        }
+    };
+
+    boolean exists = check smbClient->exists("/after_process_binary_delete");
+    if !exists {
+        check smbClient->mkdir("/after_process_binary_delete");
+    }
+
+    Listener binaryDeleteListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check binaryDeleteListener.attach(binaryDeleteService, "after_process_binary_delete");
+    check binaryDeleteListener.'start();
+    runtime:registerListener(binaryDeleteListener);
+
+    runtime:sleep(3);
+
+    afterProcessBinaryDeleteCounter = 0;
+
+    check smbClient->putBytes("/after_process_binary_delete/data.bin", [0x01, 0x02, 0x03]);
+    runtime:sleep(5);
+
+    check binaryDeleteListener.immediateStop();
+
+    test:assertTrue(afterProcessBinaryDeleteCounter >= 1, "onFile should be triggered for binary files");
+    boolean fileExists = check smbClient->exists("/after_process_binary_delete/data.bin");
+    test:assertFalse(fileExists, "Binary file should be deleted after processing via onFile handler");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "afterProcess", "onFileJson"],
+    dependsOn: [testAfterProcessDeleteOnBinaryFile]
+}
+function testAfterProcessDeleteOnJsonFile() returns error? {
+    afterProcessJsonDeleteCounter = 0;
+
+    Service jsonDeleteService = service object {
+        @FunctionConfig {
+            afterProcess: DELETE
+        }
+        remote function onFileJson(json content, FileInfo fileInfo) returns error? {
+            afterProcessJsonDeleteCounter += 1;
+        }
+
+        function onError(error err) returns error? {
+            io:println("JSON delete service error: ", err.message());
+        }
+    };
+
+    boolean exists = check smbClient->exists("/after_process_json_delete");
+    if !exists {
+        check smbClient->mkdir("/after_process_json_delete");
+    }
+
+    Listener jsonDeleteListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check jsonDeleteListener.attach(jsonDeleteService, "after_process_json_delete");
+    check jsonDeleteListener.'start();
+    runtime:registerListener(jsonDeleteListener);
+
+    runtime:sleep(3);
+
+    afterProcessJsonDeleteCounter = 0;
+
+    json testData = {id: 1, name: "test"};
+    check smbClient->putJson("/after_process_json_delete/data.json", testData);
+    runtime:sleep(5);
+
+    check jsonDeleteListener.immediateStop();
+
+    test:assertTrue(afterProcessJsonDeleteCounter >= 1, "onFileJson should be triggered");
+    boolean fileExists = check smbClient->exists("/after_process_json_delete/data.json");
+    test:assertFalse(fileExists, "JSON file should be deleted after processing");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "afterError", "onFile"],
+    dependsOn: [testAfterProcessDeleteOnJsonFile]
+}
+function testAfterErrorMoveOnBinaryFile() returns error? {
+    afterErrorMoveOnFileCounter = 0;
+
+    Service binaryErrorMoveService = service object {
+        @FunctionConfig {
+            afterError: {moveTo: "/after_error_move_binary_dest", preserveSubDirs: false}
+        }
+        remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
+            afterErrorMoveOnFileCounter += 1;
+            return error("simulated binary processing error");
+        }
+
+        function onError(error err) returns error? {
+            io:println("Binary error move service error: ", err.message());
+        }
+    };
+
+    boolean srcExists = check smbClient->exists("/after_error_move_binary_src");
+    if !srcExists {
+        check smbClient->mkdir("/after_error_move_binary_src");
+    }
+    boolean destExists = check smbClient->exists("/after_error_move_binary_dest");
+    if !destExists {
+        check smbClient->mkdir("/after_error_move_binary_dest");
+    }
+
+    Listener binaryErrorMoveListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check binaryErrorMoveListener.attach(binaryErrorMoveService, "after_error_move_binary_src");
+    check binaryErrorMoveListener.'start();
+    runtime:registerListener(binaryErrorMoveListener);
+
+    runtime:sleep(3);
+
+    afterErrorMoveOnFileCounter = 0;
+
+    check smbClient->putBytes("/after_error_move_binary_src/error.bin", [0xDE, 0xAD, 0xBE, 0xEF]);
+    runtime:sleep(5);
+
+    check binaryErrorMoveListener.immediateStop();
+
+    test:assertTrue(afterErrorMoveOnFileCounter >= 1, "onFile should be triggered for binary error test");
+    boolean fileAtSrc = check smbClient->exists("/after_error_move_binary_src/error.bin");
+    test:assertFalse(fileAtSrc, "Binary file should no longer be in source after error move");
+    boolean fileAtDest = check smbClient->exists("/after_error_move_binary_dest/error.bin");
+    test:assertTrue(fileAtDest, "Binary file should be moved to destination after error");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "onFileDelete", "pattern"],
+    dependsOn: [testAfterErrorMoveOnBinaryFile]
+}
+function testOnFileDeleteWithMatchingFunctionConfigPattern() returns error? {
+    onDeleteMatchingPatternCounter = 0;
+
+    Service patternDeleteService = service object {
+        @FunctionConfig {
+            fileNamePattern: "(.*)\\.log"
+        }
+        remote function onFileDelete(string deletedFile) returns error? {
+            onDeleteMatchingPatternCounter += 1;
+        }
+
+        remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
+        }
+
+        function onError(error err) returns error? {
+            io:println("Pattern delete service error: ", err.message());
+        }
+    };
+
+    boolean exists = check smbClient->exists("/pattern_delete_tests");
+    if !exists {
+        check smbClient->mkdir("/pattern_delete_tests");
+    }
+
+    Listener patternDeleteListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check patternDeleteListener.attach(patternDeleteService, "pattern_delete_tests");
+    check patternDeleteListener.'start();
+    runtime:registerListener(patternDeleteListener);
+
+    runtime:sleep(3);
+
+    onDeleteMatchingPatternCounter = 0;
+
+    check smbClient->putText("/pattern_delete_tests/app.log", "log content");
+    runtime:sleep(3);
+    check smbClient->delete("/pattern_delete_tests/app.log");
+    runtime:sleep(5);
+
+    check patternDeleteListener.immediateStop();
+
+    test:assertTrue(onDeleteMatchingPatternCounter >= 1,
+        "onFileDelete should be triggered for file matching @FunctionConfig pattern");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "onFileDelete", "pattern"],
+    dependsOn: [testOnFileDeleteWithMatchingFunctionConfigPattern]
+}
+function testOnFileDeleteWithNonMatchingFunctionConfigPattern() returns error? {
+    onDeleteNonMatchingPatternCounter = 0;
+
+    Service noMatchPatternDeleteService = service object {
+        @FunctionConfig {
+            fileNamePattern: "(.*)\\.csv"
+        }
+        remote function onFileDelete(string deletedFile) returns error? {
+            onDeleteNonMatchingPatternCounter += 1;
+        }
+
+        remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
+        }
+
+        function onError(error err) returns error? {
+            io:println("No-match pattern service error: ", err.message());
+        }
+    };
+
+    boolean exists = check smbClient->exists("/no_match_delete_tests");
+    if !exists {
+        check smbClient->mkdir("/no_match_delete_tests");
+    }
+
+    Listener noMatchListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check noMatchListener.attach(noMatchPatternDeleteService, "no_match_delete_tests");
+    check noMatchListener.'start();
+    runtime:registerListener(noMatchListener);
+
+    runtime:sleep(3);
+
+    onDeleteNonMatchingPatternCounter = 0;
+
+    check smbClient->putText("/no_match_delete_tests/noMatch.txt", "content");
+    runtime:sleep(3);
+    check smbClient->delete("/no_match_delete_tests/noMatch.txt");
+    runtime:sleep(5);
+
+    check noMatchListener.immediateStop();
+
+    test:assertEquals(onDeleteNonMatchingPatternCounter, 0,
+        "onFileDelete should NOT be triggered when filename does not match the @FunctionConfig pattern");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "onFileDelete", "pattern"],
+    dependsOn: [testOnFileDeleteWithNonMatchingFunctionConfigPattern]
+}
+function testOnFileDeleteWithListenerLevelFileNamePattern() returns error? {
+    onDeleteListenerPatternCounter = 0;
+
+    Service listenerPatternDeleteService = service object {
+        remote function onFileDelete(string deletedFile) returns error? {
+            onDeleteListenerPatternCounter += 1;
+        }
+
+        remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
+        }
+
+        function onError(error err) returns error? {
+            io:println("Listener pattern delete service error: ", err.message());
+        }
+    };
+
+    boolean exists = check smbClient->exists("/listener_pattern_delete_tests");
+    if !exists {
+        check smbClient->mkdir("/listener_pattern_delete_tests");
+    }
+
+    ListenerConfiguration patternListenerConfig = {
+        host: "localhost",
+        port: 445,
+        auth: {
+            credentials: {
+                username: "testuser",
+                password: "testpass"
+            }
+        },
+        share: "testshare",
+        pollingInterval: 2,
+        bufferSize: 65536,
+        fileNamePattern: "(.*)\\.log"
+    };
+
+    Listener listenerPatternListener = check new (patternListenerConfig);
+    check listenerPatternListener.attach(listenerPatternDeleteService, "listener_pattern_delete_tests");
+    check listenerPatternListener.'start();
+    runtime:registerListener(listenerPatternListener);
+
+    runtime:sleep(3);
+
+    onDeleteListenerPatternCounter = 0;
+
+    check smbClient->putText("/listener_pattern_delete_tests/system.log", "log content");
+    runtime:sleep(3);
+    check smbClient->delete("/listener_pattern_delete_tests/system.log");
+    runtime:sleep(5);
+
+    check listenerPatternListener.immediateStop();
+
+    test:assertTrue(onDeleteListenerPatternCounter >= 1,
+        "onFileDelete should be triggered for file matching listener-level fileNamePattern");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "afterError"],
+    dependsOn: [testOnFileDeleteWithListenerLevelFileNamePattern]
 }
 function testAfterProcessOnlyLeavesFileOnError() returns error? {
     noAfterErrorCounter = 0;
