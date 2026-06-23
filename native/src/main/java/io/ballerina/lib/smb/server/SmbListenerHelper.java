@@ -62,7 +62,6 @@ import io.ballerina.runtime.api.values.BString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.math.BigDecimal;
@@ -977,7 +976,7 @@ public class SmbListenerHelper {
                 case ON_FILE_JSON -> parseJsonContent(bytes, contentParamType, laxDataBinding);
                 case ON_FILE_XML -> parseXmlContent(bytes, contentParamType, laxDataBinding);
                 case ON_FILE_CSV -> parseCsvContent(env, bytes, contentParamType, listenerConfig, filePath);
-                case ON_FILE -> parseByteContent(bytes, contentParamType);
+                case ON_FILE -> parseByteContent(bytes);
                 default -> ValueCreator.createArrayValue(bytes);
             };
         }
@@ -1008,20 +1007,6 @@ public class SmbListenerHelper {
             BMap<?, ?> csvFailSafe = listenerConfig != null ?
                     listenerConfig.getMapValue(StringUtils.fromString(ENDPOINT_CONFIG_CSV_FAIL_SAFE)) : null;
 
-            if (referredType.getTag() == TypeTags.STREAM_TAG) {
-                StreamType streamType = (StreamType) referredType;
-                Type constraintType = streamType.getConstrainedType();
-                Type referredConstraintType = TypeUtils.getReferredType(constraintType);
-                InputStream inputStream = new ByteArrayInputStream(bytes);
-                if (referredConstraintType.getTag() == TypeTags.ARRAY_TAG) {
-                    ArrayType arrayType = (ArrayType) referredConstraintType;
-                    if (arrayType.getElementType().getTag() == TypeTags.STRING_TAG) {
-                        return CsvIterator.createStringArrayStream(
-                                inputStream, constraintType, laxDataBinding);
-                    }
-                }
-                return CsvIterator.createRecordStream(inputStream, constraintType, laxDataBinding);
-            }
             if (referredType.getTag() == TypeTags.ARRAY_TAG) {
                 ArrayType arrayType = (ArrayType) referredType;
                 Type elementType = TypeUtils.getReferredType(arrayType.getElementType());
@@ -1079,11 +1064,7 @@ public class SmbListenerHelper {
         return ValueCreator.createArrayValue(rows.toArray(new BArray[0]), arrayOfStringArraysType);
     }
 
-    private static Object parseByteContent(byte[] bytes, Type targetType) {
-        Type referredType = TypeUtils.getReferredType(targetType);
-        if (referredType.getTag() == TypeTags.STREAM_TAG) {
-            return ByteIterator.createByteStream(bytes);
-        }
+    private static Object parseByteContent(byte[] bytes) {
         return ValueCreator.createArrayValue(bytes);
     }
 
