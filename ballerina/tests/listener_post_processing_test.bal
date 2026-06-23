@@ -56,6 +56,10 @@ int detachServiceCounter = 0;
 int invalidRegexContentHandlerCounter = 0;
 int csvEscapedQuotesCounter = 0;
 int missingAuthErrorCounter = 0;
+int panicHandlerErrorCounter = 0;
+int moveConflictErrorCounter = 0;
+int emptyMoveToCounter = 0;
+int doubleSlashMoveCounter = 0;
 
 final ListenerConfiguration POST_PROCESSING_LISTENER_CONFIG = {
     host: "localhost",
@@ -1536,4 +1540,200 @@ function testMissingAuthCredentialsTriggersError() returns error? {
 
     test:assertTrue(missingAuthErrorCounter >= 1,
         "onError should be triggered when auth has no credentials or kerberos config");
+}
+
+// ── L816-819: virtual-thread catch block ─────────────────────────────────────
+// A Ballerina `panic` inside a handler causes callMethod() to throw a Java
+// exception (BError extends RuntimeException), hitting the catch block at L816.
+// With afterError configured, L818-819 are also hit (executePostProcessAction).
+@test:Config {
+    groups: ["listener", "post-processing", "virtual-thread"]
+}
+function testHandlerPanicTriggersVirtualThreadCatch() returns error? {
+    panicHandlerErrorCounter = 0;
+
+    Service panicService = service object {
+        @FunctionConfig {
+            afterError: DELETE
+        }
+        remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
+            panic error("forced panic to hit virtual-thread catch block at L816");
+        }
+
+        function onError(error err) returns error? {
+            panicHandlerErrorCounter += 1;
+        }
+    };
+
+    boolean exists = check smbClient->exists("/panic_handler_tests");
+    if !exists {
+        check smbClient->mkdir("/panic_handler_tests");
+    }
+
+    Listener panicListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check panicListener.attach(panicService, "panic_handler_tests");
+    check panicListener.'start();
+    runtime:registerListener(panicListener);
+
+    runtime:sleep(3);
+
+    panicHandlerErrorCounter = 0;
+
+    check smbClient->putBytes("/panic_handler_tests/panic_file.bin", [0xDE, 0xAD].cloneReadOnly());
+    runtime:sleep(6);
+
+    check panicListener.immediateStop();
+
+    test:assertTrue(panicHandlerErrorCounter >= 1,
+        "onError should be called when handler panics (L816-817 virtual-thread catch)");
+    boolean fileDeleted = check smbClient->exists("/panic_handler_tests/panic_file.bin");
+    test:assertFalse(fileDeleted,
+        "afterError:DELETE should remove the file after handler panic (L818-819)");
+}
+
+// ── L838 + L908: executePostProcessAction catch + ensureDirectoryExists catch ─
+// Pre-creating a FILE at the path where ensureDirectoryExists tries to mkdir
+// causes diskShare.mkdir() to throw (L908 catch ignored).  The subsequent
+// file.rename() then also fails, hitting the catch at L838 in
+// executePostProcessAction which calls notifyServiceOnError.
+@test:Config {
+    groups: ["listener", "post-processing", "post-process-error"]
+}
+function testMoveFailureWhenDestPathIsFile() returns error? {
+    moveConflictErrorCounter = 0;
+
+    Service moveConflictService = service object {
+        @FunctionConfig {
+            afterProcess: {moveTo: "/l908_file_as_dir/sub", preserveSubDirs: false}
+        }
+        remote function onFileText(string content, FileInfo fileInfo) returns error? {
+        }
+
+        function onError(error err) returns error? {
+            moveConflictErrorCounter += 1;
+        }
+    };
+
+    boolean srcExists = check smbClient->exists("/l908_move_src");
+    if !srcExists {
+        check smbClient->mkdir("/l908_move_src");
+    }
+    // Pre-create a FILE named "l908_file_as_dir".  When ensureDirectoryExists tries
+    // to mkdir("l908_file_as_dir"), SMBJ throws because that name already exists
+    // as a file → L908.  The subsequent rename also fails → L838.
+    check smbClient->putText("/l908_file_as_dir", "i am a file not a dir");
+
+    Listener moveConflictListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check moveConflictListener.attach(moveConflictService, "l908_move_src");
+    check moveConflictListener.'start();
+    runtime:registerListener(moveConflictListener);
+
+    runtime:sleep(3);
+
+    moveConflictErrorCounter = 0;
+
+    check smbClient->putText("/l908_move_src/conflict.txt", "trigger move failure");
+    runtime:sleep(6);
+
+    check moveConflictListener.immediateStop();
+
+    test:assertTrue(moveConflictErrorCounter >= 1,
+        "onError should fire when the move destination path cannot be created (L838 + L908)");
+}
+
+// ── L881 + L891: ensureTrailingSlash(empty) + ensureDirectoryExists early return
+// moveTo:"" triggers ensureTrailingSlash("") → returns "/" at L881.
+// The resulting destination is a root-level path ("filename"), so dirPath is ""
+// inside ensureDirectoryExists → early return at L891.
+@test:Config {
+    groups: ["listener", "post-processing", "post-process-paths"]
+}
+function testEmptyMoveToDestination() returns error? {
+    emptyMoveToCounter = 0;
+
+    Service emptyMoveToService = service object {
+        @FunctionConfig {
+            afterProcess: {moveTo: "", preserveSubDirs: false}
+        }
+        remote function onFileText(string content, FileInfo fileInfo) returns error? {
+            emptyMoveToCounter += 1;
+        }
+
+        function onError(error err) returns error? {
+            io:println("Empty moveTo error: ", err.message());
+        }
+    };
+
+    boolean srcExists = check smbClient->exists("/empty_moveto_src");
+    if !srcExists {
+        check smbClient->mkdir("/empty_moveto_src");
+    }
+
+    Listener emptyMoveToListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check emptyMoveToListener.attach(emptyMoveToService, "empty_moveto_src");
+    check emptyMoveToListener.'start();
+    runtime:registerListener(emptyMoveToListener);
+
+    runtime:sleep(3);
+
+    emptyMoveToCounter = 0;
+
+    check smbClient->putText("/empty_moveto_src/root_move.txt", "move to share root");
+    runtime:sleep(6);
+
+    check emptyMoveToListener.immediateStop();
+
+    test:assertTrue(emptyMoveToCounter >= 1, "onFileText should be triggered");
+    // File is moved to share root; clean up
+    error? cleanup = smbClient->delete("/root_move.txt");
+    if cleanup is error {
+        io:println("Cleanup of root-level file: ", cleanup.message());
+    }
+}
+
+// ── L897: empty path-segment skip inside ensureDirectoryExists ────────────────
+// moveTo:"//l897_dest" causes destinationPath to start with "//" so after
+// stripping ONE leading "/" the normalizedDest retains a leading "/".
+// ensureDirectoryExists splits the resulting dirPath ("/l897_dest") on "/" which
+// produces ["", "l897_dest"]; the empty first element hits the continue at L897.
+@test:Config {
+    groups: ["listener", "post-processing", "post-process-paths"]
+}
+function testDoubleSlashMoveToCoversEmptyPathSegment() returns error? {
+    doubleSlashMoveCounter = 0;
+
+    Service doubleSlashService = service object {
+        @FunctionConfig {
+            afterProcess: {moveTo: "//l897_dest", preserveSubDirs: false}
+        }
+        remote function onFileText(string content, FileInfo fileInfo) returns error? {
+            doubleSlashMoveCounter += 1;
+        }
+
+        function onError(error err) returns error? {
+            io:println("Double-slash move error (expected): ", err.message());
+        }
+    };
+
+    boolean srcExists = check smbClient->exists("/l897_move_src");
+    if !srcExists {
+        check smbClient->mkdir("/l897_move_src");
+    }
+
+    Listener doubleSlashListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check doubleSlashListener.attach(doubleSlashService, "l897_move_src");
+    check doubleSlashListener.'start();
+    runtime:registerListener(doubleSlashListener);
+
+    runtime:sleep(3);
+
+    doubleSlashMoveCounter = 0;
+
+    check smbClient->putText("/l897_move_src/segment.txt", "empty segment test");
+    runtime:sleep(6);
+
+    check doubleSlashListener.immediateStop();
+
+    test:assertTrue(doubleSlashMoveCounter >= 1,
+        "onFileText should be triggered (L897 empty-segment path exercised during move)");
 }
