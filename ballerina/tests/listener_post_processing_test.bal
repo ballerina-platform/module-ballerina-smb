@@ -1276,4 +1276,10 @@ function testAfterErrorMoveOnXmlFile() returns error? {
     test:assertFalse(fileAtSrc, "XML file should no longer be in source after error move");
     boolean fileAtDest = check smbClient->exists("/after_error_xml_move_dest/error.xml");
     test:assertTrue(fileAtDest, "XML file should be moved to destination after error");
+
+    // Cleanup: remove the moved XML file
+    error? cleanupResult = smbClient->delete("/after_error_xml_move_dest/error.xml");
+    if cleanupResult is error {
+        io:println("Could not clean up moved XML file: ", cleanupResult.message());
+    }
 }
