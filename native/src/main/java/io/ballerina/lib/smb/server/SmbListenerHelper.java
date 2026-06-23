@@ -60,6 +60,9 @@ import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BObject;
 import io.ballerina.runtime.api.values.BString;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -103,6 +106,7 @@ import static io.ballerina.lib.smb.client.SmbClient.WRITTEN_AT;
  * Helper class for SMB listener operations.
  */
 public class SmbListenerHelper {
+    private static final Logger log = LoggerFactory.getLogger(SmbListenerHelper.class);
     private static final int ARRAY_SIZE = 65536;
     private static final Set<String> EXECUTABLE_EXTENSIONS = Set.of(
             "exe", "bat", "cmd", "com", "msi", "ps1", "vbs", "wsf", "jar"
@@ -580,10 +584,42 @@ public class SmbListenerHelper {
             BObject service = registration.service();
             ObjectType serviceType = (ObjectType) TypeUtils.getReferredType(TypeUtils.getType(service));
             if (hasMethod(serviceType, ON_FILE_DELETE)) {
+                MethodType method = getMethod(serviceType, ON_FILE_DELETE);
                 for (String deletedFile : deletedFiles) {
-                    invokeOnFileDeleteHandler(env, service, serviceType, deletedFile, listenerConfig);
+                    if (method == null || matchesDeletedFilePattern(method, deletedFile, listenerConfig)) {
+                        invokeOnFileDeleteHandler(env, service, serviceType, deletedFile, listenerConfig);
+                    }
                 }
             }
+        }
+    }
+
+    private static boolean matchesDeletedFilePattern(MethodType method, String filePath,
+                                                      BMap<BString, Object> listenerConfig) {
+        String pattern = null;
+        BMap<BString, Object> annotations = getFunctionConfigAnnotation(method);
+        if (annotations != null) {
+            BString patternValue = annotations.getStringValue(StringUtils.fromString(FILE_NAME_PATTERN));
+            if (patternValue != null) {
+                pattern = patternValue.getValue();
+            }
+        }
+        if (pattern == null && listenerConfig != null) {
+            BString listenerPatternValue = listenerConfig.getStringValue(StringUtils.fromString(FILE_NAME_PATTERN));
+            if (listenerPatternValue != null) {
+                pattern = listenerPatternValue.getValue();
+            }
+        }
+        if (pattern == null) {
+            return true;
+        }
+        String fileName = filePath.contains(SLASH_SUFFIX)
+                ? filePath.substring(filePath.lastIndexOf(SLASH_SUFFIX) + 1)
+                : filePath;
+        try {
+            return Pattern.matches(pattern, fileName);
+        } catch (Exception e) {
+            return false;
         }
     }
 
@@ -774,7 +810,7 @@ public class SmbListenerHelper {
                 if (result instanceof BError bError) {
                     notifyServiceOnError(env, service, new Exception(bError.getErrorMessage().getValue()));
                     if (afterError != null) {
-                        executePostProcessAction(afterError, filePath, diskShare, servicePath);
+                        executePostProcessAction(env, service, afterError, filePath, diskShare, servicePath);
                     }
                 } else {
                     isSuccess = true;
@@ -782,17 +818,17 @@ public class SmbListenerHelper {
             } catch (Exception e) {
                 notifyServiceOnError(env, service, e);
                 if (afterError != null) {
-                    executePostProcessAction(afterError, filePath, diskShare, servicePath);
+                    executePostProcessAction(env, service, afterError, filePath, diskShare, servicePath);
                 }
             }
             if (isSuccess && afterProcess != null) {
-                executePostProcessAction(afterProcess, filePath, diskShare, servicePath);
+                executePostProcessAction(env, service, afterProcess, filePath, diskShare, servicePath);
             }
         });
     }
 
-    private static void executePostProcessAction(PostProcessAction action, String filePath,
-                                                  DiskShare diskShare, String servicePath) {
+    private static void executePostProcessAction(Environment env, BObject service, PostProcessAction action,
+                                                  String filePath, DiskShare diskShare, String servicePath) {
         String normalizedPath = filePath.startsWith(SLASH_SUFFIX) ? filePath.substring(1) : filePath;
         try {
             if (action.isDelete()) {
@@ -801,9 +837,7 @@ public class SmbListenerHelper {
                 executeMoveAction(diskShare, normalizedPath, filePath, action, servicePath);
             }
         } catch (Exception e) {
-            // Post-processing failures are non-fatal; log via stack trace
-            new RuntimeException("Post-processing action failed for file: " + filePath + " - " + e.getMessage(),
-                    e).printStackTrace();
+            notifyServiceOnError(env, service, e);
         }
     }
 
