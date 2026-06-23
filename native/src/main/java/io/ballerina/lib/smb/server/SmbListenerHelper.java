@@ -1158,7 +1158,6 @@ public class SmbListenerHelper {
                 options.put("storeKey", "true");
                 options.put("doNotPrompt", "true");
                 options.put("principal", principal);
-                options.put("debug", "false");
 
                 return new AppConfigurationEntry[]{
                         new AppConfigurationEntry("com.sun.security.auth.module.Krb5LoginModule",
@@ -1181,7 +1180,6 @@ public class SmbListenerHelper {
                 options.put("renewTGT", "false");
                 options.put("doNotPrompt", "false");
                 options.put("storeKey", "true");
-                options.put("debug", "false");
 
                 return new AppConfigurationEntry[]{
                         new AppConfigurationEntry(
@@ -1218,7 +1216,6 @@ public class SmbListenerHelper {
                 options.put("doNotPrompt", "true");
                 options.put("storeKey", "false");
                 options.put("principal", principal);
-                options.put("debug", "false");
 
                 return new AppConfigurationEntry[]{
                         new AppConfigurationEntry(
