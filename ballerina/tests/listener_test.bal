@@ -1382,7 +1382,10 @@ function testOnFileDeleteSingleFile() returns error? {
     onFileDeleteCounter = 0;
     capturedDeletedFilesIndividual = [];
 
-    check smbClient->mkdir("/delete_tests");
+    boolean deleteTestsExists = check smbClient->exists("/delete_tests");
+    if !deleteTestsExists {
+        check smbClient->mkdir("/delete_tests");
+    }
 
     Listener deleteListener = check new ({
         host: "localhost",

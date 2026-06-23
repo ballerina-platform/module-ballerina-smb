@@ -64,7 +64,10 @@ function testOnFileTextWithLogExtension() returns error? {
         }
     };
 
-    check smbClient->mkdir("/log_ext_tests");
+    boolean logExtExists = check smbClient->exists("/log_ext_tests");
+    if !logExtExists {
+        check smbClient->mkdir("/log_ext_tests");
+    }
 
     Listener logListener = check new (POST_PROCESSING_LISTENER_CONFIG);
     check logListener.attach(logTextService, "log_ext_tests");
@@ -105,7 +108,10 @@ function testOnFileTextWithMdExtension() returns error? {
         }
     };
 
-    check smbClient->mkdir("/md_ext_tests");
+    boolean mdExtExists = check smbClient->exists("/md_ext_tests");
+    if !mdExtExists {
+        check smbClient->mkdir("/md_ext_tests");
+    }
 
     Listener mdListener = check new (POST_PROCESSING_LISTENER_CONFIG);
     check mdListener.attach(mdTextService, "md_ext_tests");
@@ -147,7 +153,10 @@ function testFunctionConfigAnnotationOnServiceRemoteFunction() returns error? {
         }
     };
 
-    check smbClient->mkdir("/func_config_tests");
+    boolean funcConfigExists = check smbClient->exists("/func_config_tests");
+    if !funcConfigExists {
+        check smbClient->mkdir("/func_config_tests");
+    }
 
     Listener funcConfigListener = check new (POST_PROCESSING_LISTENER_CONFIG);
     check funcConfigListener.attach(funcConfigService, "func_config_tests");
@@ -187,7 +196,10 @@ function testAfterProcessDelete() returns error? {
         }
     };
 
-    check smbClient->mkdir("/after_process_delete");
+    boolean afterProcessDeleteExists = check smbClient->exists("/after_process_delete");
+    if !afterProcessDeleteExists {
+        check smbClient->mkdir("/after_process_delete");
+    }
 
     Listener deleteListener = check new (POST_PROCESSING_LISTENER_CONFIG);
     check deleteListener.attach(deleteService, "after_process_delete");
@@ -224,8 +236,14 @@ function testAfterProcessMove() returns error? {
         }
     };
 
-    check smbClient->mkdir("/after_process_move_src");
-    check smbClient->mkdir("/after_process_move_dest");
+    boolean afterProcessMoveSrcExists = check smbClient->exists("/after_process_move_src");
+    if !afterProcessMoveSrcExists {
+        check smbClient->mkdir("/after_process_move_src");
+    }
+    boolean afterProcessMoveDestExists = check smbClient->exists("/after_process_move_dest");
+    if !afterProcessMoveDestExists {
+        check smbClient->mkdir("/after_process_move_dest");
+    }
 
     Listener moveListener = check new (POST_PROCESSING_LISTENER_CONFIG);
     check moveListener.attach(moveService, "after_process_move_src");
@@ -264,9 +282,18 @@ function testAfterProcessMovePreserveSubDirs() returns error? {
         }
     };
 
-    check smbClient->mkdir("/after_process_subdirs_src");
-    check smbClient->mkdir("/after_process_subdirs_src/sub");
-    check smbClient->mkdir("/after_process_subdirs_dest");
+    boolean afterProcessSubdirsSrcExists = check smbClient->exists("/after_process_subdirs_src");
+    if !afterProcessSubdirsSrcExists {
+        check smbClient->mkdir("/after_process_subdirs_src");
+    }
+    boolean afterProcessSubdirsSrcSubExists = check smbClient->exists("/after_process_subdirs_src/sub");
+    if !afterProcessSubdirsSrcSubExists {
+        check smbClient->mkdir("/after_process_subdirs_src/sub");
+    }
+    boolean afterProcessSubdirsDestExists = check smbClient->exists("/after_process_subdirs_dest");
+    if !afterProcessSubdirsDestExists {
+        check smbClient->mkdir("/after_process_subdirs_dest");
+    }
 
     Listener subDirsListener = check new (POST_PROCESSING_LISTENER_CONFIG);
     check subDirsListener.attach(moveSubDirsService, "after_process_subdirs_src");
@@ -306,7 +333,10 @@ function testAfterErrorDelete() returns error? {
         }
     };
 
-    check smbClient->mkdir("/after_error_delete");
+    boolean afterErrorDeleteExists = check smbClient->exists("/after_error_delete");
+    if !afterErrorDeleteExists {
+        check smbClient->mkdir("/after_error_delete");
+    }
 
     Listener errorDeleteListener = check new (POST_PROCESSING_LISTENER_CONFIG);
     check errorDeleteListener.attach(errorDeleteService, "after_error_delete");
@@ -344,8 +374,14 @@ function testAfterErrorMove() returns error? {
         }
     };
 
-    check smbClient->mkdir("/after_error_move_src");
-    check smbClient->mkdir("/after_error_move_dest");
+    boolean afterErrorMoveSrcExists = check smbClient->exists("/after_error_move_src");
+    if !afterErrorMoveSrcExists {
+        check smbClient->mkdir("/after_error_move_src");
+    }
+    boolean afterErrorMoveDestExists = check smbClient->exists("/after_error_move_dest");
+    if !afterErrorMoveDestExists {
+        check smbClient->mkdir("/after_error_move_dest");
+    }
 
     Listener errorMoveListener = check new (POST_PROCESSING_LISTENER_CONFIG);
     check errorMoveListener.attach(errorMoveService, "after_error_move_src");
@@ -385,7 +421,10 @@ function testAfterProcessOnlyLeavesFileOnError() returns error? {
         }
     };
 
-    check smbClient->mkdir("/after_process_only_error");
+    boolean afterProcessOnlyErrorExists = check smbClient->exists("/after_process_only_error");
+    if !afterProcessOnlyErrorExists {
+        check smbClient->mkdir("/after_process_only_error");
+    }
 
     Listener processOnlyListener = check new (POST_PROCESSING_LISTENER_CONFIG);
     check processOnlyListener.attach(processOnlyService, "after_process_only_error");
