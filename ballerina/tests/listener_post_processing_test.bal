@@ -50,6 +50,12 @@ int afterProcessMoveNewDirCounter = 0;
 int malformedJsonErrorCounter = 0;
 int afterProcessLaxJsonCounter = 0;
 int afterErrorXmlMoveCounter = 0;
+int anonymousAuthFileCounter = 0;
+int noExtensionFileCounter = 0;
+int detachServiceCounter = 0;
+int invalidRegexContentHandlerCounter = 0;
+int csvEscapedQuotesCounter = 0;
+int missingAuthErrorCounter = 0;
 
 final ListenerConfiguration POST_PROCESSING_LISTENER_CONFIG = {
     host: "localhost",
@@ -1282,4 +1288,262 @@ function testAfterErrorMoveOnXmlFile() returns error? {
     if cleanupResult is error {
         io:println("Could not clean up moved XML file: ", cleanupResult.message());
     }
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "auth"]
+}
+function testAnonymousAuthWithPublicShare() returns error? {
+    anonymousAuthFileCounter = 0;
+
+    Service anonService = service object {
+        remote function onFileText(string content, FileInfo fileInfo) returns error? {
+            anonymousAuthFileCounter += 1;
+        }
+
+        function onError(error err) returns error? {
+            io:println("Anonymous auth service error: ", err.message());
+        }
+    };
+
+    ListenerConfiguration anonListenerConfig = {
+        host: "localhost",
+        port: 445,
+        share: "publicshare",
+        pollingInterval: 2,
+        bufferSize: 65536
+    };
+
+    boolean dirExists = check anonymousSmbClient->exists("/anon_auth_tests");
+    if !dirExists {
+        check anonymousSmbClient->mkdir("/anon_auth_tests");
+    }
+
+    Listener anonListener = check new (anonListenerConfig);
+    check anonListener.attach(anonService, "anon_auth_tests");
+    check anonListener.'start();
+    runtime:registerListener(anonListener);
+
+    runtime:sleep(3);
+
+    anonymousAuthFileCounter = 0;
+
+    check anonymousSmbClient->putText("/anon_auth_tests/hello.txt", "hello from anon test");
+    runtime:sleep(5);
+
+    check anonListener.immediateStop();
+
+    test:assertTrue(anonymousAuthFileCounter >= 1,
+        "Anonymous listener on publicshare should receive file events");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "extensions"]
+}
+function testFileWithoutExtension() returns error? {
+    noExtensionFileCounter = 0;
+
+    Service noExtService = service object {
+        @FunctionConfig {
+            afterProcess: DELETE
+        }
+        remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
+            noExtensionFileCounter += 1;
+        }
+
+        function onError(error err) returns error? {
+            io:println("No-extension file service error: ", err.message());
+        }
+    };
+
+    boolean exists = check smbClient->exists("/no_ext_tests");
+    if !exists {
+        check smbClient->mkdir("/no_ext_tests");
+    }
+
+    Listener noExtListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check noExtListener.attach(noExtService, "no_ext_tests");
+    check noExtListener.'start();
+    runtime:registerListener(noExtListener);
+
+    runtime:sleep(3);
+
+    noExtensionFileCounter = 0;
+
+    // Upload a file with no extension - isExecutableFile returns false for these
+    check smbClient->putBytes("/no_ext_tests/Makefile", "build: echo done".toBytes());
+    runtime:sleep(5);
+
+    check noExtListener.immediateStop();
+
+    test:assertTrue(noExtensionFileCounter >= 1,
+        "onFile should be triggered for files without extension");
+    boolean fileExists = check smbClient->exists("/no_ext_tests/Makefile");
+    test:assertFalse(fileExists, "File without extension should be deleted after processing");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "deregister"]
+}
+function testDetachServiceCallsDeregister() returns error? {
+    detachServiceCounter = 0;
+
+    Service detachService = service object {
+        remote function onFileText(string content, FileInfo fileInfo) returns error? {
+            detachServiceCounter += 1;
+        }
+
+        function onError(error err) returns error? {
+            io:println("Detach service error: ", err.message());
+        }
+    };
+
+    boolean exists = check smbClient->exists("/detach_service_tests");
+    if !exists {
+        check smbClient->mkdir("/detach_service_tests");
+    }
+
+    Listener detachListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check detachListener.attach(detachService, "detach_service_tests");
+    check detachListener.'start();
+    runtime:registerListener(detachListener);
+
+    runtime:sleep(3);
+
+    detachServiceCounter = 0;
+
+    check smbClient->putText("/detach_service_tests/before_detach.txt", "before detach");
+    runtime:sleep(4);
+
+    check detachListener.detach(detachService);
+
+    test:assertTrue(detachServiceCounter >= 1,
+        "onFileText should have been triggered before detach");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "pattern"]
+}
+function testInvalidRegexOnContentHandlerSkipsFile() returns error? {
+    invalidRegexContentHandlerCounter = 0;
+
+    Service invalidRegexContentService = service object {
+        @FunctionConfig {
+            fileNamePattern: "[invalid_regex_pattern"
+        }
+        remote function onFileText(string content, FileInfo fileInfo) returns error? {
+            invalidRegexContentHandlerCounter += 1;
+        }
+
+        function onError(error err) returns error? {
+            io:println("Invalid regex content handler error: ", err.message());
+        }
+    };
+
+    boolean exists = check smbClient->exists("/invalid_regex_content_tests");
+    if !exists {
+        check smbClient->mkdir("/invalid_regex_content_tests");
+    }
+
+    Listener invalidRegexContentListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check invalidRegexContentListener.attach(invalidRegexContentService, "invalid_regex_content_tests");
+    check invalidRegexContentListener.'start();
+    runtime:registerListener(invalidRegexContentListener);
+
+    runtime:sleep(3);
+
+    invalidRegexContentHandlerCounter = 0;
+
+    check smbClient->putText("/invalid_regex_content_tests/test.txt", "some content");
+    runtime:sleep(5);
+
+    check invalidRegexContentListener.immediateStop();
+
+    test:assertEquals(invalidRegexContentHandlerCounter, 0,
+        "onFileText should NOT be triggered when fileNamePattern is an invalid regex");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "csv"]
+}
+function testCsvStringArrayHandlerWithEscapedQuotes() returns error? {
+    csvEscapedQuotesCounter = 0;
+
+    Service csvEscapedService = service object {
+        @FunctionConfig {
+            afterProcess: DELETE
+        }
+        remote function onFileCsv(string[][] content, FileInfo fileInfo) returns error? {
+            csvEscapedQuotesCounter += 1;
+        }
+
+        function onError(error err) returns error? {
+            io:println("CSV escaped quotes service error: ", err.message());
+        }
+    };
+
+    boolean exists = check smbClient->exists("/csv_escaped_tests");
+    if !exists {
+        check smbClient->mkdir("/csv_escaped_tests");
+    }
+
+    Listener csvEscapedListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check csvEscapedListener.attach(csvEscapedService, "csv_escaped_tests");
+    check csvEscapedListener.'start();
+    runtime:registerListener(csvEscapedListener);
+
+    runtime:sleep(3);
+
+    csvEscapedQuotesCounter = 0;
+
+    // CSV with double-quoted fields containing escaped double quotes (e.g., "" inside quotes)
+    string csvContent = "name,description\n\"Alice\",\"She said \"\"hello\"\" to me\"\n\"Bob\",\"Normal field\"";
+    check smbClient->putBytes("/csv_escaped_tests/quoted.csv", csvContent.toBytes());
+    runtime:sleep(5);
+
+    check csvEscapedListener.immediateStop();
+
+    test:assertTrue(csvEscapedQuotesCounter >= 1,
+        "onFileCsv should be triggered for CSV with escaped quotes");
+    boolean fileExists = check smbClient->exists("/csv_escaped_tests/quoted.csv");
+    test:assertFalse(fileExists, "CSV file should be deleted after processing");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "auth"]
+}
+function testMissingAuthCredentialsTriggersError() returns error? {
+    missingAuthErrorCounter = 0;
+
+    Service missingCredService = service object {
+        remote function onFileText(string content, FileInfo fileInfo) returns error? {
+            io:println("Should not be triggered");
+        }
+
+        function onError(error err) returns error? {
+            missingAuthErrorCounter += 1;
+            io:println("Expected auth error: ", err.message());
+        }
+    };
+
+    ListenerConfiguration missingAuthConfig = {
+        host: "localhost",
+        port: 445,
+        share: "testshare",
+        auth: {},
+        pollingInterval: 2,
+        bufferSize: 65536
+    };
+
+    Listener missingAuthListener = check new (missingAuthConfig);
+    check missingAuthListener.attach(missingCredService, "any_path");
+    check missingAuthListener.'start();
+    runtime:registerListener(missingAuthListener);
+
+    runtime:sleep(5);
+
+    check missingAuthListener.immediateStop();
+
+    test:assertTrue(missingAuthErrorCounter >= 1,
+        "onError should be triggered when auth has no credentials or kerberos config");
 }
