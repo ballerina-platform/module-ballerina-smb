@@ -468,7 +468,12 @@ public class SmbListenerHelper {
                     fileInfo.getFileAttributes(), FileAttributes.FILE_ATTRIBUTE_DIRECTORY);
             String fileKey = path.endsWith(SLASH_SUFFIX) ? path + fileName : path + SLASH_SUFFIX + fileName;
             if (isFolder) {
-                collectFilesRecursively(diskShare, fileKey, result);
+                try {
+                    collectFilesRecursively(diskShare, fileKey, result);
+                } catch (Exception e) {
+                    log.debug("Skipping folder '{}' during recursive listing (may have been deleted): {}",
+                            fileKey, e.getMessage());
+                }
             } else {
                 result.put(fileKey, fileInfo);
             }
