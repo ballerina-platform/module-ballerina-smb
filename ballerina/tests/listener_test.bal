@@ -1471,4 +1471,9 @@ function testOnFileDeleteWithCaller() returns error? {
 
     test:assertTrue(onDeleteWithCallerCounter >= 1, "onFileDelete with Caller should be triggered");
     test:assertTrue(onDeleteCallerUsed, "Caller should be used successfully in onFileDelete");
+
+    error? cleanupResult = smbClient->delete("/delete_tests");
+    if cleanupResult is error {
+        io:println("Failed to clean up /delete_tests directory: ", cleanupResult.message());
+    }
 }
