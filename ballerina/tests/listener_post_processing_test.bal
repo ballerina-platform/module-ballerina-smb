@@ -1579,7 +1579,7 @@ function testHandlerPanicTriggersVirtualThreadCatch() returns error? {
 
     panicHandlerErrorCounter = 0;
 
-    check smbClient->putBytes("/panic_handler_tests/panic_file.bin", [0xDE, 0xAD].cloneReadOnly());
+    check smbClient->putBytes("/panic_handler_tests/panic_file.bin", "Data".toBytes());
     runtime:sleep(6);
 
     check panicListener.immediateStop();

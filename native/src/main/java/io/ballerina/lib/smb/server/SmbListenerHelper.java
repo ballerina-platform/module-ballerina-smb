@@ -530,17 +530,11 @@ public class SmbListenerHelper {
                                               List<SmbService> allServices,
                                               DiskShare diskShare,
                                               BMap<BString, Object> listenerConfig) {
-        if (allServices == null || allServices.isEmpty()) {
-            return;
-        }
         List<SmbService> servicesToNotify = new ArrayList<>();
         for (SmbService registration : allServices) {
             if (normalizePath(changedPath).equals(normalizePath(registration.path()))) {
                 servicesToNotify.add(registration);
             }
-        }
-        if (servicesToNotify.isEmpty()) {
-            return;
         }
         for (BMap<BString, Object> fileInfo : addedFiles) {
             String filePath = fileInfo.getStringValue(PATH).getValue();
@@ -566,17 +560,11 @@ public class SmbListenerHelper {
                                                        List<String> deletedFiles,
                                                        List<SmbService> allServices,
                                                        BMap<BString, Object> listenerConfig) {
-        if (allServices == null || allServices.isEmpty()) {
-            return;
-        }
         List<SmbService> servicesToNotify = new ArrayList<>();
         for (SmbService registration : allServices) {
             if (normalizePath(changedPath).equals(normalizePath(registration.path()))) {
                 servicesToNotify.add(registration);
             }
-        }
-        if (servicesToNotify.isEmpty()) {
-            return;
         }
         for (SmbService registration : servicesToNotify) {
             BObject service = registration.service();
@@ -869,11 +857,10 @@ public class SmbListenerHelper {
         }
         String normalizedServicePath = ensureTrailingSlash(normalizePath(servicePath));
         String normalizedFilePath = filePath.startsWith(SLASH_SUFFIX) ? filePath : SLASH_SUFFIX + filePath;
-        if (normalizedFilePath.startsWith(normalizedServicePath)) {
-            String relativePath = normalizedFilePath.substring(normalizedServicePath.length());
-            return ensureTrailingSlash(moveTo) + (relativePath.isEmpty() ? fileName : relativePath);
-        }
-        return ensureTrailingSlash(moveTo) + fileName;
+        String relativePath = normalizedFilePath.startsWith(normalizedServicePath)
+                ? normalizedFilePath.substring(normalizedServicePath.length())
+                : "";
+        return ensureTrailingSlash(moveTo) + (relativePath.isEmpty() ? fileName : relativePath);
     }
 
     private static String ensureTrailingSlash(String path) {
