@@ -96,11 +96,23 @@ service "test1" on smbListener {
         totalFilesAdded += 1;
         capturedAddedFiles.push(fileInfo);
     }
+
+    remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
+        createCounter += 1;
+        totalFilesAdded += 1;
+        capturedAddedFiles.push(fileInfo);
+    }
 }
 
 service "test2" on smbListener {
     remote function onFileText(string content, FileInfo fileInfo) returns error? {
         io:println("Resource - File created: ", fileInfo.name);
+        createCounter += 1;
+        totalFilesAdded += 1;
+        capturedAddedFiles.push(fileInfo);
+    }
+
+    remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
         createCounter += 1;
         totalFilesAdded += 1;
         capturedAddedFiles.push(fileInfo);

@@ -192,7 +192,7 @@ public annotation SmbServiceConfig ServiceConfig on service;
 
 # SMB service for handling file system change events.
 #
-public type Service distinct service object {
+public type Service service object {
 };
 
 # Record returned from the `next` method in `ContentByteStream`.
