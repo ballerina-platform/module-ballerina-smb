@@ -39,6 +39,17 @@ int onDeleteNonMatchingPatternCounter = 0;
 int onDeleteListenerPatternCounter = 0;
 int afterProcessJsonDeleteCounter = 0;
 int afterErrorMoveOnFileCounter = 0;
+int onDeleteErrorCounter = 0;
+int onDeleteInvalidRegexCounter = 0;
+int noParamHandlerFileCounter = 0;
+int fallbackToOnFileCounter = 0;
+int afterProcessMoveTrailingSlashCounter = 0;
+int afterProcessXmlDeleteCounter = 0;
+int afterProcessCsvDeleteCounter = 0;
+int afterProcessMoveNewDirCounter = 0;
+int malformedJsonErrorCounter = 0;
+int afterProcessLaxJsonCounter = 0;
+int afterErrorXmlMoveCounter = 0;
 
 final ListenerConfiguration POST_PROCESSING_LISTENER_CONFIG = {
     host: "localhost",
@@ -745,4 +756,524 @@ function testAfterProcessOnlyLeavesFileOnError() returns error? {
     test:assertTrue(noAfterErrorCounter >= 1, "onFileText should be triggered");
     boolean fileStillExists = check smbClient->exists("/after_process_only_error/stays.txt");
     test:assertTrue(fileStillExists, "File should remain when error occurs and no afterError is configured");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "onFileDelete"]
+}
+function testOnFileDeleteReturnsError() returns error? {
+    onDeleteErrorCounter = 0;
+
+    Service errorOnDeleteService = service object {
+        remote function onFileDelete(string deletedFile) returns error? {
+            onDeleteErrorCounter += 1;
+            return error("simulated onFileDelete error");
+        }
+
+        remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
+        }
+
+        function onError(error err) returns error? {
+            io:println("Expected error from onFileDelete handler: ", err.message());
+        }
+    };
+
+    boolean exists = check smbClient->exists("/delete_error_tests");
+    if !exists {
+        check smbClient->mkdir("/delete_error_tests");
+    }
+
+    Listener deleteErrorListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check deleteErrorListener.attach(errorOnDeleteService, "delete_error_tests");
+    check deleteErrorListener.'start();
+    runtime:registerListener(deleteErrorListener);
+
+    runtime:sleep(3);
+
+    onDeleteErrorCounter = 0;
+
+    check smbClient->putText("/delete_error_tests/err_file.txt", "content");
+    runtime:sleep(3);
+    check smbClient->delete("/delete_error_tests/err_file.txt");
+    runtime:sleep(5);
+
+    check deleteErrorListener.immediateStop();
+
+    test:assertTrue(onDeleteErrorCounter >= 1,
+        "onFileDelete should be triggered even when it returns an error");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "onFileDelete", "pattern"]
+}
+function testOnFileDeleteWithInvalidRegexPattern() returns error? {
+    onDeleteInvalidRegexCounter = 0;
+
+    Service invalidRegexService = service object {
+        @FunctionConfig {
+            fileNamePattern: "[invalid_regex"
+        }
+        remote function onFileDelete(string deletedFile) returns error? {
+            onDeleteInvalidRegexCounter += 1;
+        }
+
+        remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
+        }
+
+        function onError(error err) returns error? {
+            io:println("Invalid regex service error: ", err.message());
+        }
+    };
+
+    boolean exists = check smbClient->exists("/invalid_regex_delete_tests");
+    if !exists {
+        check smbClient->mkdir("/invalid_regex_delete_tests");
+    }
+
+    Listener invalidRegexListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check invalidRegexListener.attach(invalidRegexService, "invalid_regex_delete_tests");
+    check invalidRegexListener.'start();
+    runtime:registerListener(invalidRegexListener);
+
+    runtime:sleep(3);
+
+    onDeleteInvalidRegexCounter = 0;
+
+    check smbClient->putText("/invalid_regex_delete_tests/test.txt", "content");
+    runtime:sleep(3);
+    check smbClient->delete("/invalid_regex_delete_tests/test.txt");
+    runtime:sleep(5);
+
+    check invalidRegexListener.immediateStop();
+
+    test:assertEquals(onDeleteInvalidRegexCounter, 0,
+        "onFileDelete should NOT be triggered when fileNamePattern is an invalid regex");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "handlers"]
+}
+function testOnFileHandlerWithNoContentParameter() returns error? {
+    noParamHandlerFileCounter = 0;
+
+    Service noParamService = service object {
+        remote function onFile() returns error? {
+            noParamHandlerFileCounter += 1;
+        }
+
+        function onError(error err) returns error? {
+            io:println("No-param handler error: ", err.message());
+        }
+    };
+
+    boolean exists = check smbClient->exists("/no_param_handler_tests");
+    if !exists {
+        check smbClient->mkdir("/no_param_handler_tests");
+    }
+
+    Listener noParamListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check noParamListener.attach(noParamService, "no_param_handler_tests");
+    check noParamListener.'start();
+    runtime:registerListener(noParamListener);
+
+    runtime:sleep(3);
+
+    noParamHandlerFileCounter = 0;
+
+    check smbClient->putBytes("/no_param_handler_tests/data.bin", [0x01, 0x02]);
+    runtime:sleep(5);
+
+    check noParamListener.immediateStop();
+
+    test:assertEquals(noParamHandlerFileCounter, 0,
+        "Handler with no parameters should be skipped (not triggered)");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "handlers", "fallback"]
+}
+function testFallbackFromSpecificHandlerToOnFile() returns error? {
+    fallbackToOnFileCounter = 0;
+
+    Service fallbackService = service object {
+        @FunctionConfig {
+            fileNamePattern: "specific_(.*)\\.txt"
+        }
+        remote function onFileText(string content, FileInfo fileInfo) returns error? {
+            io:println("onFileText should NOT be called: ", fileInfo.name);
+        }
+
+        @FunctionConfig {
+            afterProcess: DELETE
+        }
+        remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
+            fallbackToOnFileCounter += 1;
+        }
+
+        function onError(error err) returns error? {
+            io:println("Fallback service error: ", err.message());
+        }
+    };
+
+    boolean exists = check smbClient->exists("/fallback_handler_tests");
+    if !exists {
+        check smbClient->mkdir("/fallback_handler_tests");
+    }
+
+    Listener fallbackListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check fallbackListener.attach(fallbackService, "fallback_handler_tests");
+    check fallbackListener.'start();
+    runtime:registerListener(fallbackListener);
+
+    runtime:sleep(3);
+
+    fallbackToOnFileCounter = 0;
+
+    check smbClient->putText("/fallback_handler_tests/other_file.txt", "content for fallback test");
+    runtime:sleep(5);
+
+    check fallbackListener.immediateStop();
+
+    test:assertTrue(fallbackToOnFileCounter >= 1,
+        "onFile fallback should be triggered when specific handler pattern does not match");
+    boolean fileExists = check smbClient->exists("/fallback_handler_tests/other_file.txt");
+    test:assertFalse(fileExists, "File should be deleted by onFile fallback afterProcess");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "afterProcess"]
+}
+function testAfterProcessMoveWithTrailingSlashDestination() returns error? {
+    afterProcessMoveTrailingSlashCounter = 0;
+
+    Service trailingSlashMoveService = service object {
+        @FunctionConfig {
+            afterProcess: {moveTo: "/trailing_slash_dest/", preserveSubDirs: false}
+        }
+        remote function onFileText(string content, FileInfo fileInfo) returns error? {
+            afterProcessMoveTrailingSlashCounter += 1;
+        }
+
+        function onError(error err) returns error? {
+            io:println("Trailing slash move error: ", err.message());
+        }
+    };
+
+    boolean srcExists = check smbClient->exists("/trailing_slash_src");
+    if !srcExists {
+        check smbClient->mkdir("/trailing_slash_src");
+    }
+    boolean destExists = check smbClient->exists("/trailing_slash_dest");
+    if !destExists {
+        check smbClient->mkdir("/trailing_slash_dest");
+    }
+
+    Listener trailingSlashListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check trailingSlashListener.attach(trailingSlashMoveService, "trailing_slash_src");
+    check trailingSlashListener.'start();
+    runtime:registerListener(trailingSlashListener);
+
+    runtime:sleep(3);
+
+    afterProcessMoveTrailingSlashCounter = 0;
+
+    check smbClient->putText("/trailing_slash_src/trail.txt", "content");
+    runtime:sleep(5);
+
+    check trailingSlashListener.immediateStop();
+
+    test:assertTrue(afterProcessMoveTrailingSlashCounter >= 1, "onFileText should be triggered");
+    boolean srcFileExists = check smbClient->exists("/trailing_slash_src/trail.txt");
+    test:assertFalse(srcFileExists, "File should be moved away from source");
+    boolean destFileExists = check smbClient->exists("/trailing_slash_dest/trail.txt");
+    test:assertTrue(destFileExists, "File should be in destination after move");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "afterProcess"]
+}
+function testAfterProcessDeleteOnXmlFile() returns error? {
+    afterProcessXmlDeleteCounter = 0;
+
+    Service xmlDeleteService = service object {
+        @FunctionConfig {
+            afterProcess: DELETE
+        }
+        remote function onFileXml(xml content, FileInfo fileInfo) returns error? {
+            afterProcessXmlDeleteCounter += 1;
+        }
+
+        function onError(error err) returns error? {
+            io:println("XML delete service error: ", err.message());
+        }
+    };
+
+    boolean exists = check smbClient->exists("/after_process_xml_delete");
+    if !exists {
+        check smbClient->mkdir("/after_process_xml_delete");
+    }
+
+    Listener xmlDeleteListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check xmlDeleteListener.attach(xmlDeleteService, "after_process_xml_delete");
+    check xmlDeleteListener.'start();
+    runtime:registerListener(xmlDeleteListener);
+
+    runtime:sleep(3);
+
+    afterProcessXmlDeleteCounter = 0;
+
+    check smbClient->putXml("/after_process_xml_delete/config.xml",
+        xml `<config><key>value</key></config>`);
+    runtime:sleep(5);
+
+    check xmlDeleteListener.immediateStop();
+
+    test:assertTrue(afterProcessXmlDeleteCounter >= 1, "onFileXml should be triggered");
+    boolean fileExists = check smbClient->exists("/after_process_xml_delete/config.xml");
+    test:assertFalse(fileExists, "XML file should be deleted after processing");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "afterProcess"]
+}
+function testAfterProcessDeleteOnCsvFile() returns error? {
+    afterProcessCsvDeleteCounter = 0;
+
+    Service csvDeleteService = service object {
+        @FunctionConfig {
+            afterProcess: DELETE
+        }
+        remote function onFileCsv(string[][] content, FileInfo fileInfo) returns error? {
+            afterProcessCsvDeleteCounter += 1;
+        }
+
+        function onError(error err) returns error? {
+            io:println("CSV delete service error: ", err.message());
+        }
+    };
+
+    boolean exists = check smbClient->exists("/after_process_csv_delete");
+    if !exists {
+        check smbClient->mkdir("/after_process_csv_delete");
+    }
+
+    Listener csvDeleteListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check csvDeleteListener.attach(csvDeleteService, "after_process_csv_delete");
+    check csvDeleteListener.'start();
+    runtime:registerListener(csvDeleteListener);
+
+    runtime:sleep(3);
+
+    afterProcessCsvDeleteCounter = 0;
+
+    string[][] csvData = [["id", "name"], ["1", "Alice"]];
+    check smbClient->putCsv("/after_process_csv_delete/data.csv", csvData);
+    runtime:sleep(5);
+
+    check csvDeleteListener.immediateStop();
+
+    test:assertTrue(afterProcessCsvDeleteCounter >= 1, "onFileCsv should be triggered");
+    boolean fileExists = check smbClient->exists("/after_process_csv_delete/data.csv");
+    test:assertFalse(fileExists, "CSV file should be deleted after processing");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "afterProcess"]
+}
+function testAfterProcessMoveCreatesDestinationDirectory() returns error? {
+    afterProcessMoveNewDirCounter = 0;
+
+    Service moveNewDirService = service object {
+        @FunctionConfig {
+            afterProcess: {moveTo: "/auto_created_move_dest", preserveSubDirs: false}
+        }
+        remote function onFileText(string content, FileInfo fileInfo) returns error? {
+            afterProcessMoveNewDirCounter += 1;
+        }
+
+        function onError(error err) returns error? {
+            io:println("Move new dir service error: ", err.message());
+        }
+    };
+
+    boolean srcExists = check smbClient->exists("/auto_move_src");
+    if !srcExists {
+        check smbClient->mkdir("/auto_move_src");
+    }
+    boolean destExists = check smbClient->exists("/auto_created_move_dest");
+    if destExists {
+        error? rmResult = smbClient->delete("/auto_created_move_dest");
+        if rmResult is error {
+            io:println("Could not remove dest dir: ", rmResult.message());
+        }
+    }
+
+    Listener moveNewDirListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check moveNewDirListener.attach(moveNewDirService, "auto_move_src");
+    check moveNewDirListener.'start();
+    runtime:registerListener(moveNewDirListener);
+
+    runtime:sleep(3);
+
+    afterProcessMoveNewDirCounter = 0;
+
+    check smbClient->putText("/auto_move_src/auto_dest_file.txt", "content for auto-dir creation");
+    runtime:sleep(5);
+
+    check moveNewDirListener.immediateStop();
+
+    test:assertTrue(afterProcessMoveNewDirCounter >= 1, "onFileText should be triggered");
+    boolean fileAtDest = check smbClient->exists("/auto_created_move_dest/auto_dest_file.txt");
+    test:assertTrue(fileAtDest,
+        "File should be moved to auto-created destination directory");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "content-error"]
+}
+function testMalformedJsonTriggersBErrorPath() returns error? {
+    malformedJsonErrorCounter = 0;
+
+    Service malformedJsonService = service object {
+        remote function onFileJson(json content, FileInfo fileInfo) returns error? {
+            malformedJsonErrorCounter += 1;
+        }
+
+        function onError(error err) returns error? {
+            malformedJsonErrorCounter += 1;
+            io:println("Malformed JSON error (expected): ", err.message());
+        }
+    };
+
+    boolean exists = check smbClient->exists("/malformed_json_tests");
+    if !exists {
+        check smbClient->mkdir("/malformed_json_tests");
+    }
+
+    Listener malformedJsonListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check malformedJsonListener.attach(malformedJsonService, "malformed_json_tests");
+    check malformedJsonListener.'start();
+    runtime:registerListener(malformedJsonListener);
+
+    runtime:sleep(3);
+
+    malformedJsonErrorCounter = 0;
+
+    check smbClient->putBytes("/malformed_json_tests/bad.json", "{not valid json".toBytes());
+    runtime:sleep(5);
+
+    check malformedJsonListener.immediateStop();
+
+    test:assertTrue(malformedJsonErrorCounter >= 1,
+        "onError should be triggered when JSON parsing fails (covers BError content path)");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "laxDataBinding"]
+}
+function testOnFileJsonWithLaxDataBinding() returns error? {
+    afterProcessLaxJsonCounter = 0;
+
+    Service laxJsonService = service object {
+        @FunctionConfig {
+            afterProcess: DELETE
+        }
+        remote function onFileJson(json content, FileInfo fileInfo) returns error? {
+            afterProcessLaxJsonCounter += 1;
+        }
+
+        function onError(error err) returns error? {
+            io:println("Lax JSON service error: ", err.message());
+        }
+    };
+
+    boolean exists = check smbClient->exists("/lax_json_tests");
+    if !exists {
+        check smbClient->mkdir("/lax_json_tests");
+    }
+
+    ListenerConfiguration laxListenerConfig = {
+        host: "localhost",
+        port: 445,
+        auth: {
+            credentials: {
+                username: "testuser",
+                password: "testpass"
+            }
+        },
+        share: "testshare",
+        pollingInterval: 2,
+        bufferSize: 65536,
+        laxDataBinding: true
+    };
+
+    Listener laxJsonListener = check new (laxListenerConfig);
+    check laxJsonListener.attach(laxJsonService, "lax_json_tests");
+    check laxJsonListener.'start();
+    runtime:registerListener(laxJsonListener);
+
+    runtime:sleep(3);
+
+    afterProcessLaxJsonCounter = 0;
+
+    check smbClient->putJson("/lax_json_tests/data.json", {name: "test", value: 42});
+    runtime:sleep(5);
+
+    check laxJsonListener.immediateStop();
+
+    test:assertTrue(afterProcessLaxJsonCounter >= 1,
+        "onFileJson should be triggered with laxDataBinding enabled");
+    boolean fileExists = check smbClient->exists("/lax_json_tests/data.json");
+    test:assertFalse(fileExists, "File should be deleted after processing with laxDataBinding");
+}
+
+@test:Config {
+    groups: ["listener", "post-processing", "afterError"]
+}
+function testAfterErrorMoveOnXmlFile() returns error? {
+    afterErrorXmlMoveCounter = 0;
+
+    Service xmlErrorMoveService = service object {
+        @FunctionConfig {
+            afterError: {moveTo: "/after_error_xml_move_dest", preserveSubDirs: false}
+        }
+        remote function onFileXml(xml content, FileInfo fileInfo) returns error? {
+            afterErrorXmlMoveCounter += 1;
+            return error("simulated XML processing error");
+        }
+
+        function onError(error err) returns error? {
+            io:println("XML error move service error: ", err.message());
+        }
+    };
+
+    boolean srcExists = check smbClient->exists("/after_error_xml_move_src");
+    if !srcExists {
+        check smbClient->mkdir("/after_error_xml_move_src");
+    }
+    boolean destExists = check smbClient->exists("/after_error_xml_move_dest");
+    if !destExists {
+        check smbClient->mkdir("/after_error_xml_move_dest");
+    }
+
+    Listener xmlErrorMoveListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check xmlErrorMoveListener.attach(xmlErrorMoveService, "after_error_xml_move_src");
+    check xmlErrorMoveListener.'start();
+    runtime:registerListener(xmlErrorMoveListener);
+
+    runtime:sleep(3);
+
+    afterErrorXmlMoveCounter = 0;
+
+    check smbClient->putXml("/after_error_xml_move_src/error.xml",
+        xml `<data><item>test</item></data>`);
+    runtime:sleep(5);
+
+    check xmlErrorMoveListener.immediateStop();
+
+    test:assertTrue(afterErrorXmlMoveCounter >= 1, "onFileXml should be triggered");
+    boolean fileAtSrc = check smbClient->exists("/after_error_xml_move_src/error.xml");
+    test:assertFalse(fileAtSrc, "XML file should no longer be in source after error move");
+    boolean fileAtDest = check smbClient->exists("/after_error_xml_move_dest/error.xml");
+    test:assertTrue(fileAtDest, "XML file should be moved to destination after error");
 }
