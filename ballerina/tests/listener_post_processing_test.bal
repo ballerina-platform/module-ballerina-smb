@@ -47,7 +47,8 @@ int afterProcessMoveTrailingSlashCounter = 0;
 int afterProcessXmlDeleteCounter = 0;
 int afterProcessCsvDeleteCounter = 0;
 int afterProcessMoveNewDirCounter = 0;
-int malformedJsonErrorCounter = 0;
+int malformedJsonOnFileCounter = 0;
+int malformedJsonOnErrorCounter = 0;
 int afterProcessLaxJsonCounter = 0;
 int afterErrorXmlMoveCounter = 0;
 int anonymousAuthFileCounter = 0;
@@ -1142,15 +1143,16 @@ function testAfterProcessMoveCreatesDestinationDirectory() returns error? {
     groups: ["listener", "post-processing", "content-error"]
 }
 function testMalformedJsonTriggersBErrorPath() returns error? {
-    malformedJsonErrorCounter = 0;
+    malformedJsonOnFileCounter = 0;
+    malformedJsonOnErrorCounter = 0;
 
     Service malformedJsonService = service object {
         remote function onFileJson(json content, FileInfo fileInfo) returns error? {
-            malformedJsonErrorCounter += 1;
+            malformedJsonOnFileCounter += 1;
         }
 
         function onError(error err) returns error? {
-            malformedJsonErrorCounter += 1;
+            malformedJsonOnErrorCounter += 1;
             io:println("Malformed JSON error (expected): ", err.message());
         }
     };
@@ -1167,15 +1169,18 @@ function testMalformedJsonTriggersBErrorPath() returns error? {
 
     runtime:sleep(3);
 
-    malformedJsonErrorCounter = 0;
+    malformedJsonOnFileCounter = 0;
+    malformedJsonOnErrorCounter = 0;
 
     check smbClient->putBytes("/malformed_json_tests/bad.json", "{not valid json".toBytes());
     runtime:sleep(5);
 
     check malformedJsonListener.immediateStop();
 
-    test:assertTrue(malformedJsonErrorCounter >= 1,
-        "onError should be triggered when JSON parsing fails (covers BError content path)");
+    test:assertEquals(malformedJsonOnFileCounter, 0,
+        "onFileJson should not run for malformed JSON");
+    test:assertTrue(malformedJsonOnErrorCounter >= 1,
+        "onError should be triggered when JSON parsing fails");
 }
 
 @test:Config {
