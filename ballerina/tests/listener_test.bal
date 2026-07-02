@@ -1428,6 +1428,10 @@ function testOnFileDeleteSingleFile() returns error? {
     check deleteListener.immediateStop();
     test:assertTrue(onFileDeleteCounter >= 1, "onFileDelete should be triggered at least once");
     test:assertTrue(capturedDeletedFilesIndividual.length() >= 1, "At least one deleted file should be captured");
+    error? cleanupResult = smbClient->delete("/delete_tests");
+    if cleanupResult is error {
+        io:println("Failed to clean up /delete_tests directory: ", cleanupResult.message());
+    }
 }
 
 @test:Config {
@@ -1486,6 +1490,9 @@ function testOnFileDeleteWithCaller() returns error? {
 
     test:assertTrue(onDeleteWithCallerCounter >= 1, "onFileDelete with Caller should be triggered");
     test:assertTrue(onDeleteCallerUsed, "Caller should be used successfully in onFileDelete");
+    string? callerFile = onDeleteCallerFile;
+    test:assertTrue(callerFile is string && callerFile.endsWith("/delete_tests/caller_test_file.txt"),
+        "Deleted file path should be passed to onFileDelete");
 
     error? cleanupResult = smbClient->delete("/delete_tests");
     if cleanupResult is error {

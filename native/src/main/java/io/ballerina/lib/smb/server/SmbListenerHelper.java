@@ -170,8 +170,6 @@ public class SmbListenerHelper {
     public static final String ENDPOINT_CONFIG_CSV_FAIL_SAFE = "csvFailSafe";
     public static final String ENDPOINT_CONFIG_LAX_DATA_BINDING = "laxDataBinding";
     public static final BString SIZE = StringUtils.fromString("size");
-    public static final String DOT_IDENTIFIER = ".";
-    public static final String DOUBLE_DOT_IDENTIFIER = "..";
 
     private SmbListenerHelper() {
     }
@@ -470,7 +468,7 @@ public class SmbListenerHelper {
         List<FileIdBothDirectoryInformation> files = diskShare.list(listPath);
         for (FileIdBothDirectoryInformation fileInfo : files) {
             String fileName = fileInfo.getFileName();
-            if (DOT_IDENTIFIER.equals(fileName) || DOUBLE_DOT_IDENTIFIER.equals(fileName)) {
+            if (".".equals(fileName) || "..".equals(fileName)) {
                 continue;
             }
             boolean isFolder = EnumWithValue.EnumUtils.isSet(
@@ -525,16 +523,27 @@ public class SmbListenerHelper {
         return fileInfoRecord;
     }
 
+    private static List<SmbService> matchingServices(String changedPath, List<SmbService> allServices) {
+        List<SmbService> result = new ArrayList<>();
+        for (SmbService registration : allServices) {
+            if (normalizePath(changedPath).equals(normalizePath(registration.path()))) {
+                result.add(registration);
+            }
+        }
+        return result;
+    }
+
     private static void notifyServicesForPath(Environment env, String changedPath,
                                               List<BMap<BString, Object>> addedFiles,
                                               List<SmbService> allServices,
                                               DiskShare diskShare,
                                               BMap<BString, Object> listenerConfig) {
-        List<SmbService> servicesToNotify = new ArrayList<>();
-        for (SmbService registration : allServices) {
-            if (normalizePath(changedPath).equals(normalizePath(registration.path()))) {
-                servicesToNotify.add(registration);
-            }
+        if (allServices == null || allServices.isEmpty()) {
+            return;
+        }
+        List<SmbService> servicesToNotify = matchingServices(changedPath, allServices);
+        if (servicesToNotify.isEmpty()) {
+            return;
         }
         for (BMap<BString, Object> fileInfo : addedFiles) {
             String filePath = fileInfo.getStringValue(PATH).getValue();
@@ -560,11 +569,12 @@ public class SmbListenerHelper {
                                                        List<String> deletedFiles,
                                                        List<SmbService> allServices,
                                                        BMap<BString, Object> listenerConfig) {
-        List<SmbService> servicesToNotify = new ArrayList<>();
-        for (SmbService registration : allServices) {
-            if (normalizePath(changedPath).equals(normalizePath(registration.path()))) {
-                servicesToNotify.add(registration);
-            }
+        if (allServices == null || allServices.isEmpty()) {
+            return;
+        }
+        List<SmbService> servicesToNotify = matchingServices(changedPath, allServices);
+        if (servicesToNotify.isEmpty()) {
+            return;
         }
         for (SmbService registration : servicesToNotify) {
             BObject service = registration.service();
@@ -572,7 +582,7 @@ public class SmbListenerHelper {
             if (hasMethod(serviceType, ON_FILE_DELETE)) {
                 MethodType method = getMethod(serviceType, ON_FILE_DELETE);
                 for (String deletedFile : deletedFiles) {
-                    if (method == null || matchesDeletedFilePattern(method, deletedFile, listenerConfig)) {
+                    if (matchesFilePatternForDelete(method, deletedFile, listenerConfig)) {
                         invokeOnFileDeleteHandler(env, service, serviceType, deletedFile, listenerConfig);
                     }
                 }
@@ -580,14 +590,16 @@ public class SmbListenerHelper {
         }
     }
 
-    private static boolean matchesDeletedFilePattern(MethodType method, String filePath,
-                                                      BMap<BString, Object> listenerConfig) {
+    private static boolean matchesFilePatternForDelete(MethodType method, String deletedFilePath,
+                                                        BMap<BString, Object> listenerConfig) {
         String pattern = null;
-        BMap<BString, Object> annotations = getFunctionConfigAnnotation(method);
-        if (annotations != null) {
-            BString patternValue = annotations.getStringValue(StringUtils.fromString(FILE_NAME_PATTERN));
-            if (patternValue != null) {
-                pattern = patternValue.getValue();
+        if (method != null) {
+            BMap<BString, Object> annotations = getFunctionConfigAnnotation(method);
+            if (annotations != null) {
+                BString patternValue = annotations.getStringValue(StringUtils.fromString(FILE_NAME_PATTERN));
+                if (patternValue != null) {
+                    pattern = patternValue.getValue();
+                }
             }
         }
         if (pattern == null && listenerConfig != null) {
@@ -599,9 +611,8 @@ public class SmbListenerHelper {
         if (pattern == null) {
             return true;
         }
-        String fileName = filePath.contains(SLASH_SUFFIX)
-                ? filePath.substring(filePath.lastIndexOf(SLASH_SUFFIX) + 1)
-                : filePath;
+        int lastSlash = deletedFilePath.lastIndexOf(SLASH_SUFFIX);
+        String fileName = lastSlash >= 0 ? deletedFilePath.substring(lastSlash + 1) : deletedFilePath;
         try {
             return Pattern.matches(pattern, fileName);
         } catch (Exception e) {
@@ -1081,9 +1092,13 @@ public class SmbListenerHelper {
                     StringUtils.fromString(e.getMessage()),
                     null,
                     null);
-            env.getRuntime().callMethod(service, ON_ERROR_METHOD, new StrandMetadata(true, null), bError);
-        } catch (Exception exception) {
-            // Ignore if triggering onError fails 
+            Object result = env.getRuntime().callMethod(service, ON_ERROR_METHOD,
+                    new StrandMetadata(true, null), bError);
+            if (result instanceof BError) {
+                log.debug("onError returned an error: {}", ((BError) result).getErrorMessage().getValue());
+            }
+        } catch (Exception ignored) {
+            log.debug("Service does not implement onError or error invoking onError: {}", ignored.getMessage());
         }
     }
 
@@ -1095,9 +1110,12 @@ public class SmbListenerHelper {
                 StringUtils.fromString(e.getMessage()), null, null);
         for (SmbService registration : services) {
             try {
-                env.getRuntime().callMethod(registration.service(), ON_ERROR_METHOD, null, bError);
+                Object result = env.getRuntime().callMethod(registration.service(), ON_ERROR_METHOD, null, bError);
+                if (result instanceof BError) {
+                    log.debug("onError returned an error: {}", ((BError) result).getErrorMessage().getValue());
+                }
             } catch (Exception ignored) {
-                // Ignore if triggering onError fails 
+                log.debug("Service does not implement onError or error invoking onError: {}", ignored.getMessage());
             }
         }
     }
