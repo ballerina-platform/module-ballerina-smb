@@ -1471,6 +1471,8 @@ function testOnFileDeleteWithCaller() returns error? {
 
     test:assertTrue(onDeleteWithCallerCounter >= 1, "onFileDelete with Caller should be triggered");
     test:assertTrue(onDeleteCallerUsed, "Caller should be used successfully in onFileDelete");
+    test:assertTrue(onDeleteCallerFile is string && (<string>onDeleteCallerFile).endsWith("/delete_tests/caller_test_file.txt"),
+        "Deleted file path should be passed to onFileDelete");
 
     error? cleanupResult = smbClient->delete("/delete_tests");
     if cleanupResult is error {
