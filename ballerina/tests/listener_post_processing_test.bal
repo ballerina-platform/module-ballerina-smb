@@ -1547,10 +1547,9 @@ function testMissingAuthCredentialsTriggersError() returns error? {
         "onError should be triggered when auth has no credentials or kerberos config");
 }
 
-// ── L816-819: virtual-thread catch block ─────────────────────────────────────
 // A Ballerina `panic` inside a handler causes callMethod() to throw a Java
-// exception (BError extends RuntimeException), hitting the catch block at L816.
-// With afterError configured, L818-819 are also hit (executePostProcessAction).
+// exception (BError extends RuntimeException), propagating through the virtual-thread
+// catch block. With afterError configured, the post-process action is also executed.
 @test:Config {
     groups: ["listener", "post-processing", "virtual-thread"]
 }
@@ -1562,7 +1561,7 @@ function testHandlerPanicTriggersVirtualThreadCatch() returns error? {
             afterError: DELETE
         }
         remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
-            panic error("forced panic to hit virtual-thread catch block at L816");
+            panic error("forced panic inside handler");
         }
 
         function onError(error err) returns error? {
@@ -1590,17 +1589,15 @@ function testHandlerPanicTriggersVirtualThreadCatch() returns error? {
     check panicListener.immediateStop();
 
     test:assertTrue(panicHandlerErrorCounter >= 1,
-        "onError should be called when handler panics (L816-817 virtual-thread catch)");
+        "onError should be called when handler panics");
     boolean fileDeleted = check smbClient->exists("/panic_handler_tests/panic_file.bin");
     test:assertFalse(fileDeleted,
-        "afterError:DELETE should remove the file after handler panic (L818-819)");
+        "afterError:DELETE should remove the file after handler panic");
 }
 
-// ── L838 + L908: executePostProcessAction catch + ensureDirectoryExists catch ─
 // Pre-creating a FILE at the path where ensureDirectoryExists tries to mkdir
-// causes diskShare.mkdir() to throw (L908 catch ignored).  The subsequent
-// file.rename() then also fails, hitting the catch at L838 in
-// executePostProcessAction which calls notifyServiceOnError.
+// causes diskShare.mkdir() to throw. The subsequent file.rename() then also
+// fails, causing executePostProcessAction to call notifyServiceOnError.
 @test:Config {
     groups: ["listener", "post-processing", "post-process-error"]
 }
@@ -1625,7 +1622,7 @@ function testMoveFailureWhenDestPathIsFile() returns error? {
     }
     // Pre-create a FILE named "l908_file_as_dir".  When ensureDirectoryExists tries
     // to mkdir("l908_file_as_dir"), SMBJ throws because that name already exists
-    // as a file → L908.  The subsequent rename also fails → L838.
+    // as a file. The subsequent rename also fails.
     check smbClient->putText("/l908_file_as_dir", "i am a file not a dir");
 
     Listener moveConflictListener = check new (POST_PROCESSING_LISTENER_CONFIG);
@@ -1643,13 +1640,12 @@ function testMoveFailureWhenDestPathIsFile() returns error? {
     check moveConflictListener.immediateStop();
 
     test:assertTrue(moveConflictErrorCounter >= 1,
-        "onError should fire when the move destination path cannot be created (L838 + L908)");
+        "onError should fire when the move destination path cannot be created");
 }
 
-// ── L881 + L891: ensureTrailingSlash(empty) + ensureDirectoryExists early return
-// moveTo:"" triggers ensureTrailingSlash("") → returns "/" at L881.
-// The resulting destination is a root-level path ("filename"), so dirPath is ""
-// inside ensureDirectoryExists → early return at L891.
+// moveTo:"" triggers ensureTrailingSlash("") which returns "/". The resulting
+// destination is a root-level path, so dirPath is empty inside ensureDirectoryExists
+// which returns early without attempting to create any directories.
 @test:Config {
     groups: ["listener", "post-processing", "post-process-paths"]
 }
@@ -1696,11 +1692,10 @@ function testEmptyMoveToDestination() returns error? {
     }
 }
 
-// ── L897: empty path-segment skip inside ensureDirectoryExists ────────────────
 // moveTo:"//l897_dest" causes destinationPath to start with "//" so after
 // stripping ONE leading "/" the normalizedDest retains a leading "/".
-// ensureDirectoryExists splits the resulting dirPath ("/l897_dest") on "/" which
-// produces ["", "l897_dest"]; the empty first element hits the continue at L897.
+// ensureDirectoryExists splits the resulting dirPath on "/" producing an empty
+// first segment, which is skipped during directory creation iteration.
 @test:Config {
     groups: ["listener", "post-processing", "post-process-paths"]
 }
@@ -1740,5 +1735,5 @@ function testDoubleSlashMoveToCoversEmptyPathSegment() returns error? {
     check doubleSlashListener.immediateStop();
 
     test:assertTrue(doubleSlashMoveCounter >= 1,
-        "onFileText should be triggered (L897 empty-segment path exercised during move)");
+        "onFileText should be triggered when moveTo has a double-slash prefix");
 }

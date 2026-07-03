@@ -151,7 +151,6 @@ public class SmbListenerHelper {
     private static final String AFTER_ERROR = "afterError";
     private static final String MOVE_TO = "moveTo";
     private static final String PRESERVE_SUB_DIRS = "preserveSubDirs";
-    private static final String DELETE_VALUE = "DELETE";
     private static final String FILE_INFO = "FileInfo";
     public static final String INITIALIZE_SMB_LISTENER_ERROR = "Failed to initialize SMB listener: ";
     public static final String DEREGISTER_SERVICE_ERROR = "Failed to deregister service: ";
@@ -175,13 +174,6 @@ public class SmbListenerHelper {
     }
 
     private record PostProcessAction(boolean isDelete, String moveTo, boolean preserveSubDirs) {
-        static PostProcessAction delete() {
-            return new PostProcessAction(true, null, false);
-        }
-
-        static PostProcessAction move(String moveTo, boolean preserveSubDirs) {
-            return new PostProcessAction(false, moveTo, preserveSubDirs);
-        }
     }
 
     private static boolean isExecutableFile(String fileName) {
@@ -592,32 +584,9 @@ public class SmbListenerHelper {
 
     private static boolean matchesFilePatternForDelete(MethodType method, String deletedFilePath,
                                                         BMap<BString, Object> listenerConfig) {
-        String pattern = null;
-        if (method != null) {
-            BMap<BString, Object> annotations = getFunctionConfigAnnotation(method);
-            if (annotations != null) {
-                BString patternValue = annotations.getStringValue(StringUtils.fromString(FILE_NAME_PATTERN));
-                if (patternValue != null) {
-                    pattern = patternValue.getValue();
-                }
-            }
-        }
-        if (pattern == null && listenerConfig != null) {
-            BString listenerPatternValue = listenerConfig.getStringValue(StringUtils.fromString(FILE_NAME_PATTERN));
-            if (listenerPatternValue != null) {
-                pattern = listenerPatternValue.getValue();
-            }
-        }
-        if (pattern == null) {
-            return true;
-        }
         int lastSlash = deletedFilePath.lastIndexOf(SLASH_SUFFIX);
         String fileName = lastSlash >= 0 ? deletedFilePath.substring(lastSlash + 1) : deletedFilePath;
-        try {
-            return Pattern.matches(pattern, fileName);
-        } catch (Exception e) {
-            return false;
-        }
+        return matchesPattern(method, fileName, listenerConfig);
     }
 
     private static void invokeOnFileDeleteHandler(Environment env, BObject service, ObjectType serviceType,
@@ -692,13 +661,13 @@ public class SmbListenerHelper {
             return null;
         }
         if (TypeUtils.getType(actionObj).getTag() == TypeTags.STRING_TAG) {
-            return PostProcessAction.delete();
+            return new PostProcessAction(true, null, false);
         }
         @SuppressWarnings("unchecked")
         BMap<BString, Object> moveRecord = (BMap<BString, Object>) actionObj;
         String moveTo = moveRecord.getStringValue(StringUtils.fromString(MOVE_TO)).getValue();
         boolean preserveSubDirs = moveRecord.getBooleanValue(StringUtils.fromString(PRESERVE_SUB_DIRS));
-        return PostProcessAction.move(moveTo, preserveSubDirs);
+        return new PostProcessAction(false, moveTo, preserveSubDirs);
     }
 
     private static String getHandlerMethodForExtension(String extension) {
@@ -731,12 +700,20 @@ public class SmbListenerHelper {
 
     private static boolean matchesFilePattern(MethodType method, BMap<BString, Object> fileInfo,
                                                BMap<BString, Object> listenerConfig) {
+        String fileName = fileInfo.getStringValue(NAME).getValue();
+        return matchesPattern(method, fileName, listenerConfig);
+    }
+
+    private static boolean matchesPattern(MethodType method, String fileName,
+                                          BMap<BString, Object> listenerConfig) {
         String pattern = null;
-        BMap<BString, Object> annotations = getFunctionConfigAnnotation(method);
-        if (annotations != null) {
-            BString patternValue = annotations.getStringValue(StringUtils.fromString(FILE_NAME_PATTERN));
-            if (patternValue != null) {
-                pattern = patternValue.getValue();
+        if (method != null) {
+            BMap<BString, Object> annotations = getFunctionConfigAnnotation(method);
+            if (annotations != null) {
+                BString patternValue = annotations.getStringValue(StringUtils.fromString(FILE_NAME_PATTERN));
+                if (patternValue != null) {
+                    pattern = patternValue.getValue();
+                }
             }
         }
         if (pattern == null && listenerConfig != null) {
@@ -748,7 +725,6 @@ public class SmbListenerHelper {
         if (pattern == null) {
             return true;
         }
-        String fileName = fileInfo.getStringValue(NAME).getValue();
         try {
             return Pattern.matches(pattern, fileName);
         } catch (Exception e) {
@@ -801,19 +777,20 @@ public class SmbListenerHelper {
         final boolean isConcurrentSafe = serviceType.isIsolated() && serviceType.isIsolated(methodName);
         Thread.startVirtualThread(() -> {
             boolean isSuccess = false;
+            Exception handlerError = null;
             try {
                 Object result = env.getRuntime().callMethod(service, methodName,
                         new StrandMetadata(isConcurrentSafe, null), methodArgs);
                 if (result instanceof BError bError) {
-                    notifyServiceOnError(env, service, new Exception(bError.getErrorMessage().getValue()));
-                    if (afterError != null) {
-                        executePostProcessAction(env, service, afterError, filePath, diskShare, servicePath);
-                    }
+                    handlerError = new Exception(bError.getErrorMessage().getValue());
                 } else {
                     isSuccess = true;
                 }
             } catch (Exception e) {
-                notifyServiceOnError(env, service, e);
+                handlerError = e;
+            }
+            if (handlerError != null) {
+                notifyServiceOnError(env, service, handlerError);
                 if (afterError != null) {
                     executePostProcessAction(env, service, afterError, filePath, diskShare, servicePath);
                 }
@@ -829,17 +806,13 @@ public class SmbListenerHelper {
         String normalizedPath = filePath.startsWith(SLASH_SUFFIX) ? filePath.substring(1) : filePath;
         try {
             if (action.isDelete()) {
-                executeDeleteAction(diskShare, normalizedPath);
+                diskShare.rm(normalizedPath);
             } else {
                 executeMoveAction(diskShare, normalizedPath, filePath, action, servicePath);
             }
         } catch (Exception e) {
             notifyServiceOnError(env, service, e);
         }
-    }
-
-    private static void executeDeleteAction(DiskShare diskShare, String normalizedPath) {
-        diskShare.rm(normalizedPath);
     }
 
     private static void executeMoveAction(DiskShare diskShare, String normalizedPath, String filePath,
