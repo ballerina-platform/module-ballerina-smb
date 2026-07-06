@@ -43,7 +43,7 @@ function testKerberosListenerNoKeytabNoCredentials() returns error? {
 
     Service kerbNoCredService = service object {
         remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
-            io:println("should not be reached");
+            test:assertFail("onFile should not be invoked when Kerberos auth is misconfigured");
         }
 
         function onError(error err) returns error? {
@@ -92,7 +92,7 @@ function testKerberosListenerWithInvalidKeytab() returns error? {
 
     Service kerbKeytabService = service object {
         remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
-            io:println("should not be reached");
+            test:assertFail("onFile should not be invoked when Kerberos auth is misconfigured");
         }
 
         function onError(error err) returns error? {
@@ -142,7 +142,7 @@ function testKerberosListenerWithPasswordCredentials() returns error? {
 
     Service kerbPasswordService = service object {
         remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
-            io:println("should not be reached");
+            test:assertFail("onFile should not be invoked when Kerberos auth is misconfigured");
         }
 
         function onError(error err) returns error? {
@@ -193,7 +193,7 @@ function testKerberosListenerTicketCacheFallback() returns error? {
 
     Service kerbTicketCacheService = service object {
         remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
-            io:println("should not be reached");
+            test:assertFail("onFile should not be invoked when Kerberos auth is misconfigured");
         }
 
         function onError(error err) returns error? {
@@ -269,9 +269,20 @@ function testAttachWithStringArrayNameIsNoOp() returns error? {
     test:assertEquals(result, (), "attach with string[] should return () without error");
 
     check stringArrayListener.'start();
+    runtime:registerListener(stringArrayListener);
+
+    Error? mkdirResult = smbClient->mkdir("/string_array_attach_test");
+    if mkdirResult is Error {
+        io:println("Directory may already exist: " + mkdirResult.message());
+    }
+    check smbClient->putBytes("/string_array_attach_test/trigger.bin", "no-op test".toBytes());
+
+    // Wait long enough for at least two poll cycles (pollingInterval = 2 s)
+    runtime:sleep(6);
+
     check stringArrayListener.immediateStop();
 
-    // The service was never registered so no files are processed
+    // The service was never registered so no files should be processed
     test:assertEquals(listenerStringArrayAttachCounter, 0,
         "No files should be processed when service is attached with a string[] name");
 }
@@ -288,7 +299,7 @@ function testNotifyServicesOnErrorWhenOnErrorReturnsError() returns error? {
 
     Service onErrorReturnsErrService = service object {
         remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
-            io:println("should not be reached");
+            test:assertFail("onFile should not be invoked when Kerberos auth is misconfigured");
         }
 
         function onError(error err) returns error? {
