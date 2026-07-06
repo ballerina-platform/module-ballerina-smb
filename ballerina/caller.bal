@@ -111,7 +111,7 @@ public isolated client class Caller {
     # + content - CSV content as array of arrays or array of records
     # + option - File write option (OVERWRITE or APPEND)
     # + return - `()` or else an `smb:Error` if the operation fails
-    remote isolated function putCsv(string path, string[][]|record {}[][] content,
+    remote isolated function putCsv(string path, string[][]|record {}[] content,
             FileWriteOption option = OVERWRITE) returns Error? {
         return self.'client->putCsv(path, content, option);
     }

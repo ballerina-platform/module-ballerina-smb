@@ -139,7 +139,7 @@ public isolated client class Client {
     # + content - CSV content as array of arrays or array of records
     # + option - File write option (OVERWRITE or APPEND)
     # + return - `()` or else an `smb:Error` if the operation fails
-    remote isolated function putCsv(string path, string[][]|record {}[][] content,
+    remote isolated function putCsv(string path, string[][]|record {}[] content,
             FileWriteOption option = OVERWRITE) returns Error? = @java:Method {
         'class: "io.ballerina.lib.smb.client.SmbClient"
     } external;
