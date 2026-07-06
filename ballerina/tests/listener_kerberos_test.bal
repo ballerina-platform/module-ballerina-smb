@@ -275,3 +275,108 @@ function testAttachWithStringArrayNameIsNoOp() returns error? {
     test:assertEquals(listenerStringArrayAttachCounter, 0,
         "No files should be processed when service is attached with a string[] name");
 }
+
+int kerbOnErrorReturnsErrCounter = 0;
+boolean kerbNotifyServicesOnErrorCovered = false;
+
+@test:Config {
+    groups: ["listener", "kerberos"],
+    dependsOn: [testAttachWithStringArrayNameIsNoOp]
+}
+function testNotifyServicesOnErrorWhenOnErrorReturnsError() returns error? {
+    kerbOnErrorReturnsErrCounter = 0;
+
+    Service onErrorReturnsErrService = service object {
+        remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
+            io:println("should not be reached");
+        }
+
+        function onError(error err) returns error? {
+            kerbOnErrorReturnsErrCounter += 1;
+            // Returning an error from onError exercises the
+            // `if (result instanceof BError)` branch inside notifyServicesOnError.
+            return error("intentional error returned from onError");
+        }
+    };
+
+    Listener kerbErrListener = check new ({
+        host: "localhost",
+        port: 445,
+        share: "testshare",
+        auth: {
+            kerberosConfig: {
+                principal: "user@EXAMPLE.COM"
+            }
+        },
+        pollingInterval: 1,
+        bufferSize: 65536
+    });
+
+    check kerbErrListener.attach(onErrorReturnsErrService, "any_path");
+    check kerbErrListener.'start();
+    runtime:registerListener(kerbErrListener);
+    runtime:sleep(4);
+    check kerbErrListener.immediateStop();
+
+    test:assertTrue(kerbOnErrorReturnsErrCounter >= 1,
+        "onError should be invoked when Kerberos poll fails");
+}
+
+int handlerRetErrCounter = 0;
+int handlerOnErrorRetErrCounter = 0;
+
+@test:Config {
+    groups: ["listener", "on-error"],
+    dependsOn: [testNotifyServicesOnErrorWhenOnErrorReturnsError]
+}
+function testNotifyServiceOnErrorWhenOnErrorReturnsError() returns error? {
+    handlerRetErrCounter = 0;
+    handlerOnErrorRetErrCounter = 0;
+
+    Service handlerReturnsErrService = service object {
+        remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
+            handlerRetErrCounter += 1;
+            // Returning an error causes notifyServiceOnError to be invoked.
+            return error("intentional handler error");
+        }
+
+        function onError(error err) returns error? {
+            handlerOnErrorRetErrCounter += 1;
+            // Returning an error from onError covers the
+            // `if (result instanceof BError)` branch inside notifyServiceOnError.
+            return error("intentional error returned from onError");
+        }
+    };
+
+    _ = check smbClient->mkdir("/handler_err_test");
+
+    Listener l = check new ({
+        host: "localhost",
+        port: 445,
+        auth: {
+            credentials: {
+                username: "testuser",
+                password: "testpass"
+            }
+        },
+        share: "testshare",
+        pollingInterval: 2,
+        bufferSize: 65536
+    });
+
+    check l.attach(handlerReturnsErrService, "handler_err_test");
+    check l.'start();
+    runtime:registerListener(l);
+    runtime:sleep(3);
+
+    handlerRetErrCounter = 0;
+    handlerOnErrorRetErrCounter = 0;
+    check smbClient->putBytes("/handler_err_test/trigger.bin", "test".toBytes());
+    runtime:sleep(6);
+    check l.immediateStop();
+
+    test:assertTrue(handlerRetErrCounter >= 1,
+        "onFile handler should fire and return an error");
+    test:assertTrue(handlerOnErrorRetErrCounter >= 1,
+        "onError should be invoked when onFile returns an error");
+}
