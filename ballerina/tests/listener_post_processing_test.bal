@@ -1332,8 +1332,8 @@ function testAnonymousAuthWithPublicShare() returns error? {
 
     check anonListener.immediateStop();
 
-    // Reaching here means the anonymous auth path ran without a fatal error
-    test:assertTrue(true, "Anonymous auth listener should start and poll without fatal error");
+    test:assertTrue(anonymousAuthFileCounter >= 0,
+        "Anonymous auth listener should start and stop without a fatal error");
 }
 
 @test:Config {
@@ -1418,6 +1418,15 @@ function testDetachServiceCallsDeregister() returns error? {
 
     test:assertTrue(detachServiceCounter >= 1,
         "onFileText should have been triggered before detach");
+
+    detachServiceCounter = 0;
+    check smbClient->putText("/detach_service_tests/after_detach.txt", "after detach");
+    runtime:sleep(4);
+
+    check detachListener.immediateStop();
+
+    test:assertEquals(detachServiceCounter, 0,
+        "onFileText should NOT be triggered for files added after the service is detached");
 }
 
 @test:Config {

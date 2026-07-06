@@ -276,7 +276,10 @@ function testCsvStreamHeaderOnlyFile() returns error? {
     cecHeaderOnlyCsvCounter = 0;
     cecHeaderOnlyCsvRowCount = -1;
 
-    _ = check smbClient->mkdir("/header_only_csv_test");
+    boolean headerOnlyDirExists = check smbClient->exists("/header_only_csv_test");
+    if !headerOnlyDirExists {
+        _ = check smbClient->mkdir("/header_only_csv_test");
+    }
 
     Listener l = check new ({
         host: "localhost",

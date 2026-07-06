@@ -256,7 +256,7 @@ public class SmbClient {
             log.debug("SMB client initialized successfully for host: {} share: {}", host, share);
             return null;
         } catch (Exception exception) {
-            return SmbUtil.createError(CLIENT_INITIALIZATION_ERROR + exception.getMessage(), SMB_ERROR);
+            return SmbUtil.createError(CLIENT_INITIALIZATION_ERROR + exception.getMessage(), exception, SMB_ERROR);
         }
     }
 
