@@ -561,13 +561,7 @@ public class SmbListenerHelper {
                                                        List<String> deletedFiles,
                                                        List<SmbService> allServices,
                                                        BMap<BString, Object> listenerConfig) {
-        if (allServices == null || allServices.isEmpty()) {
-            return;
-        }
         List<SmbService> servicesToNotify = matchingServices(changedPath, allServices);
-        if (servicesToNotify.isEmpty()) {
-            return;
-        }
         for (SmbService registration : servicesToNotify) {
             BObject service = registration.service();
             ObjectType serviceType = (ObjectType) TypeUtils.getReferredType(TypeUtils.getType(service));
@@ -606,15 +600,11 @@ public class SmbListenerHelper {
                 }
             }
         }
-        try {
-            boolean isConcurrentSafe = serviceType.isIsolated() && serviceType.isIsolated(ON_FILE_DELETE);
-            Object result = env.getRuntime().callMethod(service, ON_FILE_DELETE,
-                    new StrandMetadata(isConcurrentSafe, null), args.toArray());
-            if (result instanceof BError) {
-                notifyServiceOnError(env, service, new Exception(((BError) result).getErrorMessage().getValue()));
-            }
-        } catch (Exception e) {
-            notifyServiceOnError(env, service, e);
+        boolean isConcurrentSafe = serviceType.isIsolated() && serviceType.isIsolated(ON_FILE_DELETE);
+        Object result = env.getRuntime().callMethod(service, ON_FILE_DELETE,
+                new StrandMetadata(isConcurrentSafe, null), args.toArray());
+        if (result instanceof BError) {
+            notifyServiceOnError(env, service, new Exception(((BError) result).getErrorMessage().getValue()));
         }
     }
 
@@ -742,13 +732,7 @@ public class SmbListenerHelper {
         }
 
         Type contentParamType = parameters[0].type;
-        Object content;
-        try {
-            content = readFileContent(env, diskShare, filePath, methodName, contentParamType, listenerConfig);
-        } catch (Exception e) {
-            notifyServiceOnError(env, service, e);
-            return;
-        }
+        Object content = readFileContent(env, diskShare, filePath, methodName, contentParamType, listenerConfig);
 
         if (content == null || content instanceof BError
                 || TypeUtils.getType(content).getTag() == TypeTags.ERROR_TAG) {
@@ -1059,10 +1043,11 @@ public class SmbListenerHelper {
 
     private static void notifyServiceOnError(Environment env, BObject service, Exception e) {
         try {
+            String message = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
             BError bError = ErrorCreator.createError(
                     ModuleUtils.getModule(),
                     SMB_ERROR,
-                    StringUtils.fromString(e.getMessage()),
+                    StringUtils.fromString(message),
                     null,
                     null);
             Object result = env.getRuntime().callMethod(service, ON_ERROR_METHOD,
@@ -1079,8 +1064,9 @@ public class SmbListenerHelper {
         if (services == null || services.isEmpty()) {
             return;
         }
+        String message = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
         BError bError = ErrorCreator.createError(ModuleUtils.getModule(), SMB_ERROR,
-                StringUtils.fromString(e.getMessage()), null, null);
+                StringUtils.fromString(message), null, null);
         for (SmbService registration : services) {
             try {
                 Object result = env.getRuntime().callMethod(registration.service(), ON_ERROR_METHOD, null, bError);
