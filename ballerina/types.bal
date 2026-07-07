@@ -145,16 +145,39 @@ public type ListenerConfiguration record {|
     FailSafeOptions csvFailSafe?;
 |};
 
+# Delete action for file post-processing.
+# When specified, the file will be deleted after processing.
+public const DELETE = "DELETE";
+
+# Configuration for moving a file after processing.
+#
+# + moveTo - Destination directory path where the file will be moved
+# + preserveSubDirs - If `true`, preserves the subdirectory structure relative to the listener's root path
+public type Move record {|
+    string moveTo;
+    boolean preserveSubDirs = true;
+|};
+
+# Type alias for `Move` record, used in union types for post-processing actions.
+public type MOVE Move;
+
 # Configuration annotation for SMB content handler functions.
-# This annotation can be used to specify custom file name patterns for content handler methods.
+# This annotation can be used to specify custom file name patterns for content handler methods
+# and what actions to perform after processing.
 #
 # + fileNamePattern - Regular expression pattern to match file names (e.g., "(.*).txt", "data_(.*).json")
+# + afterProcess - Action to perform after successful processing. Can be `DELETE` or `MOVE`.
+#                  If not specified, no action is taken (file remains in place)
+# + afterError - Action to perform after a processing error. Can be `DELETE` or `MOVE`.
+#                If not specified, no action is taken (file remains in place)
 public type FunctionConfiguration record {|
     string fileNamePattern?;
+    MOVE|DELETE afterProcess?;
+    MOVE|DELETE afterError?;
 |};
 
 # Annotation to configure content handler function behavior.
-public annotation FunctionConfiguration FunctionConfig on function;
+public annotation FunctionConfiguration FunctionConfig on service remote function;
 
 # Provides a set of configurations for the SMB service.
 #
@@ -169,7 +192,7 @@ public annotation SmbServiceConfig ServiceConfig on service;
 
 # SMB service for handling file system change events.
 #
-public type Service distinct service object {
+public type Service service object {
 };
 
 # Record returned from the `next` method in `ContentByteStream`.

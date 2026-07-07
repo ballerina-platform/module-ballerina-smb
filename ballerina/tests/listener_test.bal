@@ -96,11 +96,23 @@ service "test1" on smbListener {
         totalFilesAdded += 1;
         capturedAddedFiles.push(fileInfo);
     }
+
+    remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
+        createCounter += 1;
+        totalFilesAdded += 1;
+        capturedAddedFiles.push(fileInfo);
+    }
 }
 
 service "test2" on smbListener {
     remote function onFileText(string content, FileInfo fileInfo) returns error? {
         io:println("Resource - File created: ", fileInfo.name);
+        createCounter += 1;
+        totalFilesAdded += 1;
+        capturedAddedFiles.push(fileInfo);
+    }
+
+    remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
         createCounter += 1;
         totalFilesAdded += 1;
         capturedAddedFiles.push(fileInfo);
@@ -1338,7 +1350,7 @@ string[] capturedDeletedFilesIndividual = [];
 
 int onDeleteWithCallerCounter = 0;
 boolean onDeleteCallerUsed = false;
-string? onDeleteCallerFile = ();
+string[] onDeleteCallerFiles = [];
 
 Service onFileDeleteService = service object {
     remote function onFileDelete(string deletedFile) returns error? {
@@ -1360,7 +1372,7 @@ Service onDeleteWithCallerService = service object {
     remote function onFileDelete(string deletedFile, Caller caller) returns error? {
         io:println("onFileDelete with Caller triggered for: ", deletedFile);
         onDeleteWithCallerCounter += 1;
-        onDeleteCallerFile = deletedFile;
+        onDeleteCallerFiles.push(deletedFile);
         FileInfo[]|error remainingFiles = caller->list("/delete_tests");
         onDeleteCallerUsed = remainingFiles is FileInfo[];
     }
@@ -1382,7 +1394,10 @@ function testOnFileDeleteSingleFile() returns error? {
     onFileDeleteCounter = 0;
     capturedDeletedFilesIndividual = [];
 
-    check smbClient->mkdir("/delete_tests");
+    boolean deleteTestsExists = check smbClient->exists("/delete_tests");
+    if !deleteTestsExists {
+        check smbClient->mkdir("/delete_tests");
+    }
 
     Listener deleteListener = check new ({
         host: "localhost",
@@ -1420,13 +1435,13 @@ function testOnFileDeleteSingleFile() returns error? {
 }
 
 @test:Config {
-    groups: ["listener", "onDelete"],
+    groups: ["listener", "onDelete", "x"],
     dependsOn: [testOnFileDeleteSingleFile]
 }
 function testOnFileDeleteWithCaller() returns error? {
     onDeleteWithCallerCounter = 0;
     onDeleteCallerUsed = false;
-    onDeleteCallerFile = ();
+    onDeleteCallerFiles = [];
 
     boolean exists = check smbClient->exists("/delete_tests");
     if !exists {
@@ -1457,7 +1472,7 @@ function testOnFileDeleteWithCaller() returns error? {
     // Reset counters
     onDeleteWithCallerCounter = 0;
     onDeleteCallerUsed = false;
-    onDeleteCallerFile = ();
+    onDeleteCallerFiles = [];
 
     // Create a file
     check smbClient->putText("/delete_tests/caller_test_file.txt", "Content for caller test");
@@ -1475,9 +1490,8 @@ function testOnFileDeleteWithCaller() returns error? {
 
     test:assertTrue(onDeleteWithCallerCounter >= 1, "onFileDelete with Caller should be triggered");
     test:assertTrue(onDeleteCallerUsed, "Caller should be used successfully in onFileDelete");
-    string? callerFile = onDeleteCallerFile;
-    test:assertTrue(callerFile is string && callerFile.endsWith("/delete_tests/caller_test_file.txt"),
-        "Deleted file path should be passed to onFileDelete");
+    boolean callerFileFound = onDeleteCallerFiles.some(f => f.endsWith("/delete_tests/caller_test_file.txt"));
+    test:assertTrue(callerFileFound, "Deleted file path should be passed to onFileDelete");
 
     error? cleanupResult = smbClient->delete("/delete_tests");
     if cleanupResult is error {
