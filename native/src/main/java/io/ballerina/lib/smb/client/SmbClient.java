@@ -133,6 +133,9 @@ public class SmbClient {
     public static final String MISSING_CREDENTIALS_FOR_KERBEROS_ERROR =
             "Credentials with password must be provided for Kerberos authentication when keytab is not specified";
     public static final String DIALECT_NOT_SPECIFIED_ERROR = "At least one dialect must be specified";
+    public static final String ANONYMOUS_AUTH_DIALECT_ERROR =
+            "Anonymous authentication is only compatible with SMB_2_1 and SMB_2_0_2 dialects. "
+            + "Please restrict the dialects configuration to SMB_2_1 and/or SMB_2_0_2.";
 
     private static final Set<String> EXECUTABLE_EXTENSIONS = Set.of(
             "exe", "bat", "cmd", "com", "msi", "ps1", "vbs", "wsf", "jar"
@@ -233,13 +236,14 @@ public class SmbClient {
             }
             List<SMB2Dialect> dialectList = IntStream.range(0, dialectsArray.size())
                     .mapToObj(i -> mapDialect(dialectsArray.getBString(i).getValue()))
-                    .filter(dialect -> !isAnonymous ||
-                            dialect == SMB2Dialect.SMB_2_0_2 || dialect == SMB2Dialect.SMB_2_1)
                     .collect(Collectors.toList());
 
-            if (isAnonymous && dialectList.isEmpty()) {
-                dialectList.add(SMB2Dialect.SMB_2_1);
-                dialectList.add(SMB2Dialect.SMB_2_0_2);
+            if (isAnonymous) {
+                boolean hasIncompatibleDialect = dialectList.stream()
+                        .anyMatch(d -> d != SMB2Dialect.SMB_2_0_2 && d != SMB2Dialect.SMB_2_1);
+                if (hasIncompatibleDialect) {
+                    return SmbUtil.createError(CLIENT_INITIALIZATION_ERROR + ANONYMOUS_AUTH_DIALECT_ERROR, SMB_ERROR);
+                }
             }
             SMB2Dialect[] dialects = dialectList.toArray(new SMB2Dialect[0]);
             configBuilder.withDialects(dialects);
@@ -334,7 +338,7 @@ public class SmbClient {
         });
     }
 
-    private static SMB2Dialect mapDialect(String dialectStr) {
+    public static SMB2Dialect mapDialect(String dialectStr) {
         switch (dialectStr) {
             case DIALECT_SMB_3_1_1 -> {
                 return SMB2Dialect.SMB_3_1_1;

@@ -1315,12 +1315,14 @@ function testAnonymousAuthWithPublicShare() returns error? {
         }
     };
 
+    // Anonymous auth is only compatible with SMB_2_1 and SMB_2_0_2 dialects.
     ListenerConfiguration anonListenerConfig = {
         host: "localhost",
         port: 445,
         share: "publicshare",
         pollingInterval: 2,
-        bufferSize: 65536
+        bufferSize: 65536,
+        dialects: [SMB_2_1, SMB_2_0_2]
     };
 
     Listener anonListener = check new (anonListenerConfig);
@@ -1334,6 +1336,46 @@ function testAnonymousAuthWithPublicShare() returns error? {
 
     test:assertTrue(anonymousAuthFileCounter >= 0,
         "Anonymous auth listener should start and stop without a fatal error");
+}
+
+int anonymousDialectErrorCounter = 0;
+
+@test:Config {
+    groups: ["listener", "post-processing", "auth"]
+}
+function testAnonymousListenerWithSMB3DialectsFails() returns error? {
+    anonymousDialectErrorCounter = 0;
+
+    Service dialectErrService = service object {
+        remote function onFileText(string content, FileInfo fileInfo) returns error? {
+            test:assertFail("onFileText should not be invoked when dialect configuration is incompatible");
+        }
+
+        function onError(error err) returns error? {
+            anonymousDialectErrorCounter += 1;
+        }
+    };
+
+    ListenerConfiguration incompatibleDialectConfig = {
+        host: "localhost",
+        port: 445,
+        share: "publicshare",
+        pollingInterval: 2,
+        bufferSize: 65536,
+        dialects: [SMB_3_1_1, SMB_3_0_2, SMB_3_0, SMB_2_1, SMB_2_0_2]
+    };
+
+    Listener dialectErrListener = check new (incompatibleDialectConfig);
+    check dialectErrListener.attach(dialectErrService, "");
+    check dialectErrListener.'start();
+    runtime:registerListener(dialectErrListener);
+
+    runtime:sleep(5);
+
+    check dialectErrListener.immediateStop();
+
+    test:assertTrue(anonymousDialectErrorCounter >= 1,
+        "onError should be triggered when anonymous auth is used with SMB 3.x dialects");
 }
 
 @test:Config {

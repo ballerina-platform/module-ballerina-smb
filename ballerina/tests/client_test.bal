@@ -28,11 +28,13 @@ final Client smbClient = check new ({
     share: "testshare"
 });
 
-// Client with anonymous authentication (no auth config)
+// Client with anonymous authentication (no auth config).
+// Anonymous auth is only compatible with SMB_2_1 and SMB_2_0_2 dialects.
 final Client anonymousSmbClient = check new ({
     host: "localhost",
     port: 445,
-    share: "publicshare"
+    share: "publicshare",
+    dialects: [SMB_2_1, SMB_2_0_2]
 });
 
 @test:Config {
@@ -142,4 +144,36 @@ function testKerberosClientWithTicketCache() returns error? {
     });
     test:assertTrue(kerbClient is Error,
         "Kerberos ticket-cache client should fail when no TGT is available");
+}
+
+@test:Config {
+    groups: ["client", "anonymous"]
+}
+function testAnonymousClientWithSMB3DialectsFails() {
+    Client|Error result = new ({
+        host: "localhost",
+        port: 445,
+        share: "publicshare",
+        dialects: [SMB_3_1_1, SMB_3_0_2, SMB_3_0, SMB_2_1, SMB_2_0_2]
+    });
+    test:assertTrue(result is Error,
+        "Anonymous client with SMB 3.x dialects should fail with a dialect compatibility error");
+    if result is Error {
+        test:assertTrue(result.message().includes("SMB_2_1") && result.message().includes("SMB_2_0_2"),
+            "Error message should mention the compatible dialects");
+    }
+}
+
+@test:Config {
+    groups: ["client", "anonymous"]
+}
+function testAnonymousClientWithOnlySMB3DialectsFails() {
+    Client|Error result = new ({
+        host: "localhost",
+        port: 445,
+        share: "publicshare",
+        dialects: [SMB_3_1_1]
+    });
+    test:assertTrue(result is Error,
+        "Anonymous client with only SMB 3.x dialects should fail");
 }
