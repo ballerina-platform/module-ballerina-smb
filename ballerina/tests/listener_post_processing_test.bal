@@ -52,6 +52,7 @@ int malformedJsonOnErrorCounter = 0;
 int afterProcessLaxJsonCounter = 0;
 int afterErrorXmlMoveCounter = 0;
 int anonymousAuthFileCounter = 0;
+int anonymousAuthErrorCounter = 0;
 int noExtensionFileCounter = 0;
 int detachServiceCounter = 0;
 int invalidRegexContentHandlerCounter = 0;
@@ -1304,6 +1305,9 @@ function testAfterErrorMoveOnXmlFile() returns error? {
 }
 function testAnonymousAuthWithPublicShare() returns error? {
     anonymousAuthFileCounter = 0;
+    anonymousAuthErrorCounter = 0;
+
+    check anonymousSmbClient->putText("/anon_listener_test.txt", "anonymous listener test", OVERWRITE);
 
     Service anonService = service object {
         remote function onFileText(string content, FileInfo fileInfo) returns error? {
@@ -1311,7 +1315,7 @@ function testAnonymousAuthWithPublicShare() returns error? {
         }
 
         function onError(error err) returns error? {
-            io:println("Anonymous auth service error: ", err.message());
+            anonymousAuthErrorCounter += 1;
         }
     };
 
@@ -1326,7 +1330,7 @@ function testAnonymousAuthWithPublicShare() returns error? {
     };
 
     Listener anonListener = check new (anonListenerConfig);
-    check anonListener.attach(anonService, "");
+    check anonListener.attach(anonService, "/");
     check anonListener.'start();
     runtime:registerListener(anonListener);
 
@@ -1334,17 +1338,21 @@ function testAnonymousAuthWithPublicShare() returns error? {
 
     check anonListener.immediateStop();
 
-    test:assertTrue(anonymousAuthFileCounter >= 0,
-        "Anonymous auth listener should start and stop without a fatal error");
+    test:assertEquals(anonymousAuthErrorCounter, 0,
+        "No errors should occur when anonymous auth is used with compatible dialects");
+    test:assertTrue(anonymousAuthFileCounter >= 1,
+        "Listener should detect the file written to the public share");
 }
 
 int anonymousDialectErrorCounter = 0;
+string anonymousDialectErrorMessage = "";
 
 @test:Config {
     groups: ["listener", "post-processing", "auth"]
 }
 function testAnonymousListenerWithSMB3DialectsFails() returns error? {
     anonymousDialectErrorCounter = 0;
+    anonymousDialectErrorMessage = "";
 
     Service dialectErrService = service object {
         remote function onFileText(string content, FileInfo fileInfo) returns error? {
@@ -1353,6 +1361,7 @@ function testAnonymousListenerWithSMB3DialectsFails() returns error? {
 
         function onError(error err) returns error? {
             anonymousDialectErrorCounter += 1;
+            anonymousDialectErrorMessage = err.message();
         }
     };
 
@@ -1376,6 +1385,8 @@ function testAnonymousListenerWithSMB3DialectsFails() returns error? {
 
     test:assertTrue(anonymousDialectErrorCounter >= 1,
         "onError should be triggered when anonymous auth is used with SMB 3.x dialects");
+    test:assertTrue(anonymousDialectErrorMessage.includes("SMB_2_1") && anonymousDialectErrorMessage.includes("SMB_2_0_2"),
+        "Error message should mention the compatible dialects");
 }
 
 @test:Config {
