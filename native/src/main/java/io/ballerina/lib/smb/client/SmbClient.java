@@ -619,6 +619,29 @@ public class SmbClient {
         outputStream.flush();
     }
 
+    private static void writeFileFromStream(BObject clientEndpoint, String filePath,
+                                            InputStream inputStream, boolean append) throws IOException {
+        DiskShare share = retrieveShare(clientEndpoint);
+        Set<AccessMask> accessMask = new HashSet<>();
+        accessMask.add(AccessMask.GENERIC_WRITE);
+
+        Set<FileAttributes> fileAttributes = new HashSet<>();
+        fileAttributes.add(FileAttributes.FILE_ATTRIBUTE_NORMAL);
+
+        SMB2CreateDisposition disposition = append ?
+                SMB2CreateDisposition.FILE_OPEN_IF : SMB2CreateDisposition.FILE_OVERWRITE_IF;
+
+        File file = share.openFile(filePath, accessMask, fileAttributes, SMB2ShareAccess.ALL,
+                disposition, EnumSet.noneOf(SMB2CreateOptions.class));
+        OutputStream outputStream = file.getOutputStream(append);
+        byte[] buffer = new byte[ARRAY_SIZE];
+        int bytesRead;
+        while ((bytesRead = inputStream.read(buffer)) != -1) {
+            outputStream.write(buffer, 0, bytesRead);
+        }
+        outputStream.flush();
+    }
+
     private static Session authenticateSession(Connection connection, BObject clientEndpoint) throws IOException {
         String authType = (String) clientEndpoint.getNativeData(AUTH_TYPE);
         AuthenticationContext authContext;
@@ -907,9 +930,8 @@ public class SmbClient {
         return env.yieldAndRun(() -> {
             try {
                 InputStream stream = createInputStreamFromIterator(env, inputContent.getIteratorObj());
-                byte[] bytes = stream.readAllBytes();
                 boolean append = WRITE_OPTION_APPEND.equals(option.getValue());
-                writeFileBytes(clientEndpoint, filePath.getValue(), bytes, append);
+                writeFileFromStream(clientEndpoint, filePath.getValue(), stream, append);
                 return null;
             } catch (Exception e) {
                 return SmbUtil.createError(WRITE_FILE_ERROR + e.getMessage(), SMB_ERROR);
@@ -924,8 +946,7 @@ public class SmbClient {
                 boolean append = WRITE_OPTION_APPEND.equals(option.getValue());
                 boolean addHeader = !append;
                 InputStream stream = createInputStreamFromIterator(env, inputContent.getIteratorObj(), addHeader);
-                byte[] bytes = stream.readAllBytes();
-                writeFileBytes(clientEndpoint, filePath.getValue(), bytes, append);
+                writeFileFromStream(clientEndpoint, filePath.getValue(), stream, append);
                 return null;
             } catch (Exception e) {
                 return SmbUtil.createError(WRITE_CSV_FILE_ERROR + e.getMessage(), SMB_ERROR);
