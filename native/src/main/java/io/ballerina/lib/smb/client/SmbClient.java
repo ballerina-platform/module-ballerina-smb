@@ -37,6 +37,7 @@ import com.hierynomus.smbj.share.DiskShare;
 import com.hierynomus.smbj.share.File;
 import io.ballerina.lib.smb.iterator.ByteIterator;
 import io.ballerina.lib.smb.iterator.CsvIterator;
+import io.ballerina.lib.smb.iterator.IteratorToInputStream;
 import io.ballerina.lib.smb.util.CSVUtils;
 import io.ballerina.lib.smb.util.ModuleUtils;
 import io.ballerina.lib.smb.util.SmbContentConverter;
@@ -54,6 +55,7 @@ import io.ballerina.runtime.api.values.BArray;
 import io.ballerina.runtime.api.values.BDecimal;
 import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BObject;
+import io.ballerina.runtime.api.values.BStream;
 import io.ballerina.runtime.api.values.BString;
 import io.ballerina.runtime.api.values.BTypedesc;
 import org.slf4j.Logger;
@@ -63,12 +65,15 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.SequenceInputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -895,6 +900,55 @@ public class SmbClient {
                 return SmbUtil.createError(WRITE_CSV_FILE_ERROR + e.getMessage(), SMB_ERROR);
             }
         });
+    }
+
+    public static Object putBytesAsStream(Environment env, BObject clientEndpoint, BString filePath,
+                                           BStream inputContent, BString option) {
+        return env.yieldAndRun(() -> {
+            try {
+                InputStream stream = createInputStreamFromIterator(env, inputContent.getIteratorObj());
+                byte[] bytes = stream.readAllBytes();
+                boolean append = WRITE_OPTION_APPEND.equals(option.getValue());
+                writeFileBytes(clientEndpoint, filePath.getValue(), bytes, append);
+                return null;
+            } catch (Exception e) {
+                return SmbUtil.createError(WRITE_FILE_ERROR + e.getMessage(), SMB_ERROR);
+            }
+        });
+    }
+
+    public static Object putCsvAsStream(Environment env, BObject clientEndpoint, BString filePath,
+                                         BStream inputContent, BString option) {
+        return env.yieldAndRun(() -> {
+            try {
+                InputStream stream = createInputStreamFromIterator(env, inputContent.getIteratorObj());
+                byte[] bytes = stream.readAllBytes();
+                boolean append = WRITE_OPTION_APPEND.equals(option.getValue());
+                writeFileBytes(clientEndpoint, filePath.getValue(), bytes, append);
+                return null;
+            } catch (Exception e) {
+                return SmbUtil.createError(WRITE_CSV_FILE_ERROR + e.getMessage(), SMB_ERROR);
+            }
+        });
+    }
+
+    private static InputStream createInputStreamFromIterator(Environment environment, BObject iterator) {
+        IteratorToInputStream streamIterator = new IteratorToInputStream(environment, iterator);
+        return new SequenceInputStream(asEnumeration(streamIterator));
+    }
+
+    private static <T> Enumeration<T> asEnumeration(Iterator<T> iterator) {
+        return new Enumeration<T>() {
+            @Override
+            public boolean hasMoreElements() {
+                return iterator.hasNext();
+            }
+
+            @Override
+            public T nextElement() {
+                return iterator.next();
+            }
+        };
     }
 
     private static byte[] readFileContentFromShare(DiskShare share, String filePath) throws IOException {

@@ -144,6 +144,37 @@ public isolated client class Client {
         'class: "io.ballerina.lib.smb.client.SmbClient"
     } external;
 
+    # Writes a byte stream to a file on an SMB share.
+    # ```ballerina
+    # stream<byte[], error?> byteStream = check client->getBytesAsStream(srcPath);
+    # smb:Error? response = client->putBytesAsStream(destPath, byteStream, smb:OVERWRITE);
+    # ```
+    #
+    # + path - The resource path
+    # + content - Byte stream content to write
+    # + option - File write option (OVERWRITE or APPEND)
+    # + return - `()` or else an `smb:Error` if the operation fails
+    remote isolated function putBytesAsStream(string path, stream<byte[], error?> content,
+            FileWriteOption option = OVERWRITE) returns Error? = @java:Method {
+        'class: "io.ballerina.lib.smb.client.SmbClient"
+    } external;
+
+    # Writes a CSV stream to a file on an SMB share.
+    # Supports streams of string arrays or records.
+    # ```ballerina
+    # stream<string[], error?> csvStream = check client->getCsvAsStream(srcPath);
+    # smb:Error? response = client->putCsvAsStream(destPath, csvStream, smb:OVERWRITE);
+    # ```
+    #
+    # + path - The resource path
+    # + content - CSV stream content as a stream of string arrays or records
+    # + option - File write option (OVERWRITE or APPEND)
+    # + return - `()` or else an `smb:Error` if the operation fails
+    remote isolated function putCsvAsStream(string path, stream<string[]|record {}, error?> content,
+            FileWriteOption option = OVERWRITE) returns Error? = @java:Method {
+        'class: "io.ballerina.lib.smb.client.SmbClient"
+    } external;
+
     # Reads a file from an SMB share as a byte array.
     # ```ballerina
     # byte[]|smb:Error content = client->getBytes(path);
