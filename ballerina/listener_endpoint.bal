@@ -56,6 +56,8 @@ public isolated class Listener {
         if name is string? {
             return self.register(smbService, name);
         }
+        return error Error("Unsupported service name type: string[] is not supported. " +
+            "Use a string or () value instead.");
     }
 
     # Stops the SMB listener and detaches the service.

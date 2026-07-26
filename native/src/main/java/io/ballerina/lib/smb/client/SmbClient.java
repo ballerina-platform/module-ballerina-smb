@@ -921,9 +921,10 @@ public class SmbClient {
                                          BStream inputContent, BString option) {
         return env.yieldAndRun(() -> {
             try {
-                InputStream stream = createInputStreamFromIterator(env, inputContent.getIteratorObj());
-                byte[] bytes = stream.readAllBytes();
                 boolean append = WRITE_OPTION_APPEND.equals(option.getValue());
+                boolean addHeader = !append;
+                InputStream stream = createInputStreamFromIterator(env, inputContent.getIteratorObj(), addHeader);
+                byte[] bytes = stream.readAllBytes();
                 writeFileBytes(clientEndpoint, filePath.getValue(), bytes, append);
                 return null;
             } catch (Exception e) {
@@ -934,6 +935,12 @@ public class SmbClient {
 
     private static InputStream createInputStreamFromIterator(Environment environment, BObject iterator) {
         IteratorToInputStream streamIterator = new IteratorToInputStream(environment, iterator);
+        return new SequenceInputStream(asEnumeration(streamIterator));
+    }
+
+    private static InputStream createInputStreamFromIterator(Environment environment, BObject iterator,
+                                                             boolean addHeader) {
+        IteratorToInputStream streamIterator = new IteratorToInputStream(environment, iterator, addHeader);
         return new SequenceInputStream(asEnumeration(streamIterator));
     }
 

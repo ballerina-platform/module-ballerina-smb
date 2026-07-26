@@ -48,11 +48,16 @@ public final class IteratorToInputStream implements Iterator<InputStream> {
     private final BObject iterator;
     private InputStream nextStream;
     private boolean hasChecked;
-    private boolean isFirstRow = true;
+    private boolean isFirstRow;
 
     public IteratorToInputStream(Environment env, BObject iterator) {
+        this(env, iterator, true);
+    }
+
+    public IteratorToInputStream(Environment env, BObject iterator, boolean addHeader) {
         this.env = env;
         this.iterator = iterator;
+        this.isFirstRow = addHeader;
     }
 
     @Override
