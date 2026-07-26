@@ -209,7 +209,7 @@ public isolated client class Client {
     # + path - The resource path
     # + targetType - The type descriptor of the target type (default: string[][])
     # + return - CSV content as the target type or an `smb:Error` if the operation fails
-    remote isolated function getCsv(string path, typedesc<anydata[][]> targetType = <>)
+    remote isolated function getCsv(string path, typedesc<string[][]|record {}[]> targetType = <>)
             returns targetType|Error = @java:Method {
         'class: "io.ballerina.lib.smb.client.SmbClient"
     } external;
