@@ -1,0 +1,4 @@
+[package]
+org = "smb_test"
+name = "invalid_on_file_delete_5"
+version = "0.1.0"
