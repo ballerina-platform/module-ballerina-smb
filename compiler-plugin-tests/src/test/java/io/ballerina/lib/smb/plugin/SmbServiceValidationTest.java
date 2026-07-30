@@ -175,6 +175,17 @@ public class SmbServiceValidationTest {
         assertErrors("invalid_content_service_6", INVALID_CONTENT_PARAMETER_TYPE, INVALID_OPTIONAL_PARAMETER);
     }
 
+    @Test(description = "Stream completion types the listener cannot satisfy are rejected")
+    public void testInvalidStreamCompletionType() {
+        assertErrors("invalid_stream_completion_1", INVALID_CONTENT_PARAMETER_TYPE,
+                INVALID_CONTENT_PARAMETER_TYPE, INVALID_CONTENT_PARAMETER_TYPE);
+    }
+
+    @Test(description = "Completion types that accept what the listener produces are allowed")
+    public void testValidStreamCompletionType() {
+        assertNoErrors("valid_stream_completion");
+    }
+
     @Test(description = "Diagnostic wording matches the phrasing used by other Ballerina listener plugins")
     public void testDiagnosticMessages() {
         assertMessages("invalid_service_2",

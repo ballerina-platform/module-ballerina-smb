@@ -18,6 +18,7 @@
 
 package io.ballerina.lib.smb.plugin;
 
+import io.ballerina.compiler.api.Types;
 import io.ballerina.compiler.api.symbols.ArrayTypeSymbol;
 import io.ballerina.compiler.api.symbols.StreamTypeSymbol;
 import io.ballerina.compiler.api.symbols.TypeDescKind;
@@ -153,11 +154,35 @@ public class SmbContentFunctionValidator {
             return ((ArrayTypeSymbol) typeSymbol).memberTypeDescriptor().typeKind() == BYTE;
         }
         if (typeKind == STREAM) {
-            TypeSymbol itemType = ((StreamTypeSymbol) typeSymbol).typeParameter();
+            StreamTypeSymbol streamTypeSymbol = (StreamTypeSymbol) typeSymbol;
+            if (!hasErrorOrNilCompletionType(streamTypeSymbol)) {
+                return false;
+            }
+            TypeSymbol itemType = streamTypeSymbol.typeParameter();
             return itemType instanceof ArrayTypeSymbol arrayType &&
                     arrayType.memberTypeDescriptor().typeKind() == BYTE;
         }
         return false;
+    }
+
+    /**
+     * Checks that a stream parameter's completion type accepts what the listener produces.
+     *
+     * <p>The listener always builds its streams with an {@code error?} completion type
+     * ({@code ByteIterator} and {@code CsvIterator}), so a handler declaring anything narrower, such as
+     * {@code stream<byte[], int>}, would compile and then fail when the stream is passed to it.
+     *
+     * @param streamTypeSymbol the declared stream type
+     * @return true if the declared completion type accepts {@code error?}
+     */
+    private boolean hasErrorOrNilCompletionType(StreamTypeSymbol streamTypeSymbol) {
+        TypeSymbol completionType = streamTypeSymbol.completionValueTypeParameter();
+        if (completionType == null) {
+            return false;
+        }
+        // Equivalent to `error? <: completionType`, without constructing a union through TypeBuilder.
+        Types types = context.semanticModel().types();
+        return types.ERROR.subtypeOf(completionType) && types.NIL.subtypeOf(completionType);
     }
 
     private boolean validateOnFileCsvContentType(TypeDescKind typeKind, TypeSymbol typeSymbol) {
@@ -175,11 +200,17 @@ public class SmbContentFunctionValidator {
     }
 
     private boolean isRecordStream(StreamTypeSymbol streamType) {
+        if (!hasErrorOrNilCompletionType(streamType)) {
+            return false;
+        }
         TypeSymbol itemType = streamType.typeParameter();
         return itemType.typeKind() == RECORD || isRecordTypeReference(itemType);
     }
 
     private boolean isStringArrayStream(StreamTypeSymbol streamType) {
+        if (!hasErrorOrNilCompletionType(streamType)) {
+            return false;
+        }
         TypeSymbol itemType = streamType.typeParameter();
         return itemType instanceof ArrayTypeSymbol arrayType &&
                 arrayType.memberTypeDescriptor().typeKind() == STRING;
