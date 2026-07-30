@@ -96,7 +96,7 @@ service "timesheetValidator" on smbListener {
         log:printInfo(string `Successfully processed file: ${fileInfo.name}`);
     }
 
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         log:printError(string `Error processing timesheet file: ${err.message()}`, err);
     }
 }

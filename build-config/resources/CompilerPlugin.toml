@@ -1,0 +1,6 @@
+[plugin]
+id = "smb-compiler-plugin"
+class = "io.ballerina.lib.smb.plugin.SmbCompilerPlugin"
+
+[[dependency]]
+path = "../compiler-plugin/build/libs/smb-compiler-plugin-@project.version@.jar"

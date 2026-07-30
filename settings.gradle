@@ -47,11 +47,15 @@ rootProject.name = 'smb'
 include ':checkstyle'
 include ':smb-native'
 include ':smb-ballerina'
+include ':smb-compiler-plugin'
+include ':smb-compiler-plugin-tests'
 include ':smb-examples'
 
 project(':checkstyle').projectDir = file("build-config${File.separator}checkstyle")
 project(':smb-native').projectDir = file('native')
 project(':smb-ballerina').projectDir = file('ballerina')
+project(':smb-compiler-plugin').projectDir = file('compiler-plugin')
+project(':smb-compiler-plugin-tests').projectDir = file('compiler-plugin-tests')
 project(':smb-examples').projectDir = file('examples')
 
 gradleEnterprise {

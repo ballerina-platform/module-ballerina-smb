@@ -88,7 +88,7 @@ service "salesReportProcessor" on smbListener {
         log:printInfo(string `File moved to processed: ${fileInfo.name}`);
     }
 
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         log:printError(string `Error processing file: ${err.message()}`, err);
     }
 }
