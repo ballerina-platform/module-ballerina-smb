@@ -5,7 +5,7 @@ version = "@toml.version@"
 authors = ["Ballerina"]
 keywords = ["smb", "file", "network shares"]
 repository = "https://github.com/ballerina-platform/module-ballerina-smb"
-# icon = "icon.png"
+icon = "icon.png"
 license = ["Apache-2.0"]
 distribution = "2201.12.0"
 
