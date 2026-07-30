@@ -270,9 +270,11 @@ public class SmbListenerHelper {
 
     public static Object poll(Environment env, BObject listenerEndpoint) {
         return env.yieldAndRun(() -> {
-            BMap<BString, Object> config =
-                (BMap<BString, Object>) listenerEndpoint.getNativeData(SMB_SERVICE_ENDPOINT_CONFIG);
+            // Declared out here so the catch can hand the config to onError, but read inside the try so a
+            // failing lookup still becomes a polling error rather than escaping as a panic.
+            BMap<BString, Object> config = null;
             try {
+                config = (BMap<BString, Object>) listenerEndpoint.getNativeData(SMB_SERVICE_ENDPOINT_CONFIG);
                 checkForFileChanges(env, listenerEndpoint, config);
                 return null;
             } catch (Exception e) {
