@@ -61,6 +61,7 @@ int panicHandlerErrorCounter = 0;
 int moveConflictErrorCounter = 0;
 int emptyMoveToCounter = 0;
 int doubleSlashMoveCounter = 0;
+int onErrorWithCallerCounter = 0;
 
 final ListenerConfiguration POST_PROCESSING_LISTENER_CONFIG = {
     host: "localhost",
@@ -1745,4 +1746,49 @@ function testDoubleSlashMoveToCoversEmptyPathSegment() returns error? {
 
     test:assertTrue(doubleSlashMoveCounter >= 1,
         "onFileText should be triggered when moveTo has a double-slash prefix");
+}
+
+@test:Config {
+    groups: ["listener", "onError", "caller"]
+}
+function testOnErrorWithOptionalCallerParameter() returns error? {
+    onErrorWithCallerCounter = 0;
+
+    Service onErrorCallerService = service object {
+        remote function onFileJson(json content, FileInfo fileInfo) returns error? {
+            return;
+        }
+
+        // The optional second parameter must receive a usable Caller.
+        remote function onError(error err, Caller caller) returns error? {
+            check caller->putText("/on_error_caller_tests/quarantine.txt", err.message());
+            onErrorWithCallerCounter += 1;
+        }
+    };
+
+    boolean exists = check smbClient->exists("/on_error_caller_tests");
+    if !exists {
+        check smbClient->mkdir("/on_error_caller_tests");
+    }
+
+    Listener onErrorCallerListener = check new (POST_PROCESSING_LISTENER_CONFIG);
+    check onErrorCallerListener.attach(onErrorCallerService, "on_error_caller_tests");
+    check onErrorCallerListener.'start();
+    runtime:registerListener(onErrorCallerListener);
+
+    runtime:sleep(3);
+
+    onErrorWithCallerCounter = 0;
+
+    // Malformed JSON makes content binding fail, which invokes onError.
+    check smbClient->putBytes("/on_error_caller_tests/bad.json", "{not valid json".toBytes());
+    runtime:sleep(5);
+
+    check onErrorCallerListener.immediateStop();
+
+    test:assertTrue(onErrorWithCallerCounter >= 1,
+        "onError should be triggered with a Caller when it declares the optional second parameter");
+    boolean quarantineExists = check smbClient->exists("/on_error_caller_tests/quarantine.txt");
+    test:assertTrue(quarantineExists,
+        "The Caller passed to onError should be usable for write operations");
 }

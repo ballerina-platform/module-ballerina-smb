@@ -27,6 +27,7 @@ import static io.ballerina.lib.smb.plugin.PluginConstants.CompilationErrors.DUPL
 import static io.ballerina.lib.smb.plugin.PluginConstants.CompilationErrors.INVALID_CONTENT_PARAMETER_TYPE;
 import static io.ballerina.lib.smb.plugin.PluginConstants.CompilationErrors.INVALID_OPTIONAL_PARAMETER;
 import static io.ballerina.lib.smb.plugin.PluginConstants.CompilationErrors.INVALID_ON_ERROR_FIRST_PARAMETER;
+import static io.ballerina.lib.smb.plugin.PluginConstants.CompilationErrors.INVALID_ON_ERROR_SECOND_PARAMETER;
 import static io.ballerina.lib.smb.plugin.PluginConstants.CompilationErrors.INVALID_ON_FILE_DELETE_CALLER_PARAMETER;
 import static io.ballerina.lib.smb.plugin.PluginConstants.CompilationErrors.INVALID_ON_FILE_DELETE_PARAMETER;
 import static io.ballerina.lib.smb.plugin.PluginConstants.CompilationErrors.INVALID_REMOTE_FUNCTION;
@@ -153,13 +154,18 @@ public class SmbServiceValidationTest {
         assertErrors("invalid_on_error_2", INVALID_ON_ERROR_FIRST_PARAMETER);
     }
 
-    @Test(description = "onError does not accept a trailing Caller parameter")
+    @Test(description = "The optional second parameter of onError must be Caller")
     public void testInvalidOnError3() {
-        assertErrors("invalid_on_error_3", TOO_MANY_PARAMETERS_ON_ERROR);
+        assertErrors("invalid_on_error_3", INVALID_ON_ERROR_SECOND_PARAMETER);
     }
 
     @Test(description = "onError requires the error parameter")
     public void testInvalidOnError4() {
         assertErrors("invalid_on_error_4", INVALID_ON_ERROR_FIRST_PARAMETER);
+    }
+
+    @Test(description = "onError accepts at most two parameters")
+    public void testInvalidOnError5() {
+        assertErrors("invalid_on_error_5", TOO_MANY_PARAMETERS_ON_ERROR);
     }
 }

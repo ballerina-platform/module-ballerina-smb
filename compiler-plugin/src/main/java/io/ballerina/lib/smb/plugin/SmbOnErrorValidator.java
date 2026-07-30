@@ -30,19 +30,17 @@ import io.ballerina.projects.plugins.SyntaxNodeAnalysisContext;
 import java.util.Optional;
 
 import static io.ballerina.lib.smb.plugin.PluginConstants.CompilationErrors.INVALID_ON_ERROR_FIRST_PARAMETER;
+import static io.ballerina.lib.smb.plugin.PluginConstants.CompilationErrors.INVALID_ON_ERROR_SECOND_PARAMETER;
 import static io.ballerina.lib.smb.plugin.PluginConstants.CompilationErrors.ON_ERROR_MUST_BE_REMOTE;
 import static io.ballerina.lib.smb.plugin.PluginConstants.CompilationErrors.TOO_MANY_PARAMETERS_ON_ERROR;
 import static io.ballerina.lib.smb.plugin.PluginUtils.reportErrorDiagnostic;
 
 /**
  * Validates the onError remote function of an SMB service.
- *
- * <p>The SMB listener dispatches {@code onError} with the error as its only argument, so unlike the
- * content handlers this method does not accept a trailing {@code smb:Caller} parameter.
  */
 public class SmbOnErrorValidator {
 
-    private static final int EXPECTED_PARAM_COUNT = 1;
+    private static final int MAX_PARAM_COUNT = 2;
 
     private final SyntaxNodeAnalysisContext context;
     private final FunctionDefinitionNode functionDefinitionNode;
@@ -64,12 +62,18 @@ public class SmbOnErrorValidator {
             return;
         }
 
-        if (parameters.size() > EXPECTED_PARAM_COUNT) {
+        if (parameters.size() > MAX_PARAM_COUNT) {
             reportErrorDiagnostic(context, TOO_MANY_PARAMETERS_ON_ERROR, functionDefinitionNode.location());
             return;
         }
 
         validateErrorParameter(parameters.get(0));
+
+        if (parameters.size() == MAX_PARAM_COUNT &&
+                !PluginUtils.validateCallerParameter(parameters.get(1), context)) {
+            reportErrorDiagnostic(context, INVALID_ON_ERROR_SECOND_PARAMETER, parameters.get(1).location());
+        }
+
         PluginUtils.validateReturnTypeErrorOrNil(functionDefinitionNode, context);
     }
 

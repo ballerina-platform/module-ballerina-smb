@@ -50,7 +50,7 @@ service "ContentService" on remoteServer {
         return;
     }
 
-    remote function onError(smb:Error err) returns error? {
+    remote function onError(smb:Error err, smb:Caller caller) returns error? {
         return;
     }
 }

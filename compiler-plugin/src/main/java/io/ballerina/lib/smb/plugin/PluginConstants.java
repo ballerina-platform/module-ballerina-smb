@@ -90,8 +90,10 @@ public final class PluginConstants {
         ON_ERROR_MUST_BE_REMOTE("onError method must be remote.", "SMB_130"),
         INVALID_ON_ERROR_FIRST_PARAMETER("Invalid first parameter for onError. First parameter must be " +
                 "'smb:Error' or 'error'.", "SMB_131"),
-        TOO_MANY_PARAMETERS_ON_ERROR("Too many parameters for onError. Accepts exactly 1 parameter: (error).",
-                "SMB_132");
+        INVALID_ON_ERROR_SECOND_PARAMETER("Invalid second parameter for onError. " +
+                "Optional second parameter must be 'smb:Caller'.", "SMB_132"),
+        TOO_MANY_PARAMETERS_ON_ERROR("Too many parameters for onError. Accepts at most 2 parameters: " +
+                "(error, caller?).", "SMB_133");
 
         private final String error;
         private final String errorCode;

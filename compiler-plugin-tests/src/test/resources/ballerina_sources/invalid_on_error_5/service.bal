@@ -14,18 +14,19 @@
 // specific language governing permissions and limitations
 // under the License.
 
+
 import ballerina/smb;
 
 listener smb:Listener remoteServer = check new ({share: "testshare"});
 
-// Expected: INVALID_ON_ERROR_SECOND_PARAMETER
-service "BadOnErrorSecondParamService" on remoteServer {
+// Expected: TOO_MANY_PARAMETERS_ON_ERROR
+service "TooManyOnErrorParamsService" on remoteServer {
 
     remote function onFileText(string content) returns error? {
         return;
     }
 
-    remote function onError(smb:Error err, smb:FileInfo fileInfo) returns error? {
+    remote function onError(smb:Error err, smb:Caller caller, string extra) returns error? {
         return;
     }
 }
