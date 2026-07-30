@@ -73,3 +73,73 @@ function testAnonymousClientListFiles() returns error? {
     FileInfo[]|error listResult = anonymousSmbClient->list("test");
     test:assertTrue(listResult !is error, "Anonymous client should be able to list files");
 }
+
+@test:Config {
+    groups: ["client", "kerberos"]
+}
+function testKerberosClientWithPassword() returns error? {
+    // credentials + kerberosConfig (no keytab) → loginWithPassword() in SmbClient
+    Client|Error kerbClient = new ({
+        host: "localhost",
+        port: 445,
+        share: "testshare",
+        auth: {
+            credentials: {
+                username: "user",
+                password: "kerbpass"
+            },
+            kerberosConfig: {
+                principal: "user@EXAMPLE.COM"
+            }
+        }
+    });
+    test:assertTrue(kerbClient is Error,
+        "Kerberos password-based client should fail when no KDC is available");
+}
+
+@test:Config {
+    groups: ["client", "kerberos"],
+    dependsOn: [testKerberosClientWithPassword]
+}
+function testKerberosClientWithKeytab() returns error? {
+    // kerberosConfig + invalid keytab + configFile (no credentials) → loginWithKeytab()
+    // Also covers the setKerberosSystemProperties configFile branch.
+    Client|Error kerbClient = new ({
+        host: "localhost",
+        port: 445,
+        share: "testshare",
+        auth: {
+            kerberosConfig: {
+                principal: "user@EXAMPLE.COM",
+                keytab: "/nonexistent/path/keytab.keytab",
+                configFile: "/nonexistent/krb5.conf"
+            }
+        }
+    });
+    test:assertTrue(kerbClient is Error,
+        "Kerberos keytab-based client should fail when keytab file does not exist");
+}
+
+@test:Config {
+    groups: ["client", "kerberos"],
+    dependsOn: [testKerberosClientWithKeytab]
+}
+function testKerberosClientWithTicketCache() returns error? {
+    // credentials + kerberosConfig, EMPTY password, no keytab → loginWithTicketCache()
+    Client|Error kerbClient = new ({
+        host: "localhost",
+        port: 445,
+        share: "testshare",
+        auth: {
+            credentials: {
+                username: "user",
+                password: ""
+            },
+            kerberosConfig: {
+                principal: "user@EXAMPLE.COM"
+            }
+        }
+    });
+    test:assertTrue(kerbClient is Error,
+        "Kerberos ticket-cache client should fail when no TGT is available");
+}

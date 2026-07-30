@@ -96,6 +96,40 @@ function testGetBytesAsStreamEmpty() returns error? {
 }
 
 @test:Config {
+    groups: ["stream", "getCsvAsStream", "getCsvAsStreamRecord"],
+    dependsOn: [testGetCsvAsStreamWithSpecialChars]
+}
+function testGetCsvAsStreamEmptyRecords() returns error? {
+    string path = "/streamtest/csv-stream-empty-records.csv";
+    // Header only — no data rows. CsvIterator sees length == 0 and returns null immediately.
+    string csvContent = "name,age,department";
+    check streamTestClient->putText(path, csvContent, OVERWRITE);
+    stream<Employee, error?> csvStream = check streamTestClient->getCsvAsStream(path);
+    int rowCount = 0;
+    check from Employee _ in csvStream
+        do {
+            rowCount += 1;
+        };
+    test:assertEquals(rowCount, 0, "CSV with only a header row should produce no records");
+}
+
+@test:Config {
+    groups: ["stream", "getCsvAsStream", "getCsvAsStreamRecord"],
+    dependsOn: [testGetCsvAsStreamEmptyRecords]
+}
+function testGetCsvAsStreamInvalidTypeConversion() returns error? {
+    string path = "/streamtest/csv-stream-invalid-type.csv";
+    // "not-a-number" cannot be converted to int for Employee.age.
+    // Native.parseBytes returns a BError, covering the error-tag branch in CsvIterator.next().
+    string csvContent = "name,age,department\nAlice,not-a-number,Engineering";
+    check streamTestClient->putText(path, csvContent, OVERWRITE);
+    stream<Employee, error?> csvStream = check streamTestClient->getCsvAsStream(path);
+    record {|Employee value;|}|error? firstRow = csvStream.next();
+    test:assertTrue(firstRow is error,
+        "Stream should return an error when CSV value cannot be converted to the target type");
+}
+
+@test:Config {
     groups: ["stream", "getBytesAsStream"],
     dependsOn: [testGetBytesAsStreamEmpty]
 }
@@ -319,6 +353,40 @@ function testGetCsvAsStreamWithLaxDataBinding() returns error? {
         age: 35
     }];
     test:assertEquals(result, expectedResult);
+}
+
+// ── getJson with laxDataBinding=true (covers createJsonParseOptions lax branch) ─
+@test:Config {}
+function testGetJsonWithLaxDataBinding() returns error? {
+    string path = "/streamtest/lax-binding.json";
+    // JSON has extra fields not in PersonData; lax binding ignores them
+    json content = {name: "Alice", age: 25, extraField: "ignored", nested: {x: 1}};
+    check laxDataBindingClient->putJson(path, content, OVERWRITE);
+    PersonData|Error result = laxDataBindingClient->getJson(path);
+    test:assertTrue(result is PersonData,
+        "getJson with laxDataBinding=true should bind extra fields without error");
+    if result is PersonData {
+        test:assertEquals(result.name, "Alice");
+        test:assertEquals(result.age, 25);
+    }
+}
+
+// ── getCsv (non-stream) with laxDataBinding=true (covers createCsvParseOptions lax branch) ─
+// getCsv constrains targetType to anydata[][], so use string[][] here.
+// The laxDataBinding=true flag is still forwarded to createCsvParseOptions regardless of type,
+// which exercises the `if (laxDataBinding)` true branch in Java.
+@test:Config {}
+function testGetCsvWithLaxDataBinding() returns error? {
+    string path = "/streamtest/lax-binding.csv";
+    string csvContent = "name,age\nAlice,25\nBob,30";
+    check laxDataBindingClient->putText(path, csvContent, OVERWRITE);
+    string[][]|Error result = laxDataBindingClient->getCsv(path);
+    test:assertTrue(result is string[][],
+        "getCsv with laxDataBinding=true should return string[][] successfully");
+    if result is string[][] {
+        test:assertEquals(result.length(), 2);
+        test:assertEquals(result[0][0], "Alice");
+    }
 }
 
 @test:Config {
