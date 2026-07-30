@@ -96,18 +96,20 @@ public final class CompilerPluginTestUtils {
         Assert.assertEquals(actualCodes, expectedCodes, "Unexpected diagnostics for '" + path + "': " + errors);
     }
 
-    public static void assertDiagnosticCode(Diagnostic diagnostic, CompilationErrors error) {
-        Assert.assertEquals(diagnostic.diagnosticInfo().code(), error.getErrorCode(),
-                "Unexpected diagnostic: " + diagnostic);
-    }
-
-    public static void assertDiagnostic(Diagnostic diagnostic, CompilationErrors error) {
-        Assert.assertEquals(diagnostic.diagnosticInfo().code(), error.getErrorCode());
-        Assert.assertEquals(diagnostic.diagnosticInfo().messageFormat(), error.getError());
-    }
-
-    public static void assertDiagnostic(Diagnostic diagnostic, CompilationErrors error, String expectedMessage) {
-        Assert.assertEquals(diagnostic.diagnosticInfo().code(), error.getErrorCode());
-        Assert.assertEquals(diagnostic.message(), expectedMessage);
+    /**
+     * Asserts the exact rendered text of the diagnostics reported for the given test package.
+     * This pins the wording, not just the codes, so that a diagnostic cannot silently drift away
+     * from the phrasing used by the other Ballerina listener compiler plugins.
+     *
+     * @param path the test package directory under {@code ballerina_sources}
+     * @param expectedMessages the expected messages, in any order
+     */
+    public static void assertMessages(String path, String... expectedMessages) {
+        List<String> actual = compileAndGetErrors(path).stream()
+                .map(Diagnostic::message)
+                .sorted()
+                .toList();
+        List<String> expected = Arrays.stream(expectedMessages).sorted().toList();
+        Assert.assertEquals(actual, expected, "Unexpected diagnostic messages for '" + path + "'");
     }
 }

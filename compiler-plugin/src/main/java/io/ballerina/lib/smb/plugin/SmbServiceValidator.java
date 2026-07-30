@@ -76,7 +76,7 @@ public class SmbServiceValidator {
             }
 
             String funcName = functionName.get();
-            if (PluginConstants.ALL_FORMAT_HANDLERS.contains(funcName)) {
+            if (PluginConstants.ALL_CONTENT_HANDLERS.contains(funcName)) {
                 contentMethods.add(functionDefinitionNode);
                 contentMethodNames.add(funcName);
             } else if (ON_FILE_DELETE_FUNC.equals(funcName)) {
@@ -85,7 +85,7 @@ public class SmbServiceValidator {
                 onError = functionDefinitionNode;
             } else if (isRemoteFunction(context, functionDefinitionNode)) {
                 context.reportDiagnostic(getDiagnostic(INVALID_REMOTE_FUNCTION,
-                        DiagnosticSeverity.ERROR, functionDefinitionNode.location()));
+                        DiagnosticSeverity.ERROR, functionDefinitionNode.location(), funcName));
             }
         }
 

@@ -21,6 +21,7 @@ package io.ballerina.lib.smb.plugin;
 import org.testng.annotations.Test;
 
 import static io.ballerina.lib.smb.plugin.CompilerPluginTestUtils.assertErrors;
+import static io.ballerina.lib.smb.plugin.CompilerPluginTestUtils.assertMessages;
 import static io.ballerina.lib.smb.plugin.CompilerPluginTestUtils.assertNoErrors;
 import static io.ballerina.lib.smb.plugin.PluginConstants.CompilationErrors.CONTENT_METHOD_MUST_BE_REMOTE;
 import static io.ballerina.lib.smb.plugin.PluginConstants.CompilationErrors.DUPLICATE_OPTIONAL_PARAMETER;
@@ -161,11 +162,59 @@ public class SmbServiceValidationTest {
 
     @Test(description = "onError requires the error parameter")
     public void testInvalidOnError4() {
-        assertErrors("invalid_on_error_4", INVALID_ON_ERROR_FIRST_PARAMETER);
+        assertErrors("invalid_on_error_4", MANDATORY_PARAMETER_NOT_FOUND);
     }
 
     @Test(description = "onError accepts at most two parameters")
     public void testInvalidOnError5() {
         assertErrors("invalid_on_error_5", TOO_MANY_PARAMETERS_ON_ERROR);
+    }
+
+    @Test(description = "Content parameter types whose signature contains curly braces")
+    public void testInvalidContentService6() {
+        assertErrors("invalid_content_service_6", INVALID_CONTENT_PARAMETER_TYPE, INVALID_OPTIONAL_PARAMETER);
+    }
+
+    @Test(description = "Diagnostic wording matches the phrasing used by other Ballerina listener plugins")
+    public void testDiagnosticMessages() {
+        assertMessages("invalid_service_2",
+                "invalid remote method name `onFileChange`, smb listener only supports `onFile`, `onFileText`, "
+                        + "`onFileJson`, `onFileXml`, `onFileCsv`, `onFileDelete` and `onError` remote methods");
+
+        assertMessages("invalid_service_1",
+                "resource methods are not allowed in smb services",
+                "at least a single `onFile*` or `onFileDelete` remote method required in the service");
+
+        assertMessages("invalid_content_service_1",
+                "missing remote keyword in the `onFileText` method",
+                "missing remote keyword in the `onFileJson` method");
+
+        assertMessages("invalid_content_service_2",
+                "missing required parameter in the `onFileText` method, expected `string`",
+                "missing required parameter in the `onFileCsv` method, expected `string[][]`, a record array, "
+                        + "`stream<string[], error?>` or a stream of records");
+
+        assertMessages("invalid_content_service_4",
+                "invalid parameter type `string` provided for the `onFileText` method, only `smb:FileInfo` and "
+                        + "`smb:Caller` are allowed as optional parameters",
+                "duplicate `smb:FileInfo` parameter in the `onFileXml` method",
+                "invalid parameter type `int` provided for the `onFileJson` method, only `smb:FileInfo` and "
+                        + "`smb:Caller` are allowed as optional parameters");
+
+        assertMessages("invalid_on_file_delete_2",
+                "invalid parameter type `string[]` provided for the `onFileDelete` method, expected `string`");
+
+        assertMessages("invalid_on_error_3",
+                "invalid parameter type `smb:FileInfo` provided for the `onError` method, only `smb:Caller` is "
+                        + "allowed as the optional parameter");
+    }
+
+    @Test(description = "A type signature containing curly braces renders instead of aborting compilation")
+    public void testBraceTypeMessagesRender() {
+        assertMessages("invalid_content_service_6",
+                "invalid parameter type `record {|int x;|}` provided for the `onFileText` method, "
+                        + "expected `string`",
+                "invalid parameter type `record {|int y;|}` provided for the `onFileJson` method, only "
+                        + "`smb:FileInfo` and `smb:Caller` are allowed as optional parameters");
     }
 }

@@ -63,15 +63,36 @@ public final class PluginUtils {
     }
 
     public static Diagnostic getDiagnostic(CompilationErrors error, DiagnosticSeverity severity, Location location) {
-        DiagnosticInfo diagnosticInfo = new DiagnosticInfo(error.getErrorCode(), error.getError(), severity);
+        DiagnosticInfo diagnosticInfo = new DiagnosticInfo(error.getErrorCode(),
+                escapeBraces(error.getError()), severity);
         return DiagnosticFactory.createDiagnostic(diagnosticInfo, location);
     }
 
     public static Diagnostic getDiagnostic(CompilationErrors error, DiagnosticSeverity severity, Location location,
                                            Object... args) {
         String errorMessage = String.format(error.getError(), args);
-        DiagnosticInfo diagnosticInfo = new DiagnosticInfo(error.getErrorCode(), errorMessage, severity);
+        DiagnosticInfo diagnosticInfo = new DiagnosticInfo(error.getErrorCode(),
+                escapeBraces(errorMessage), severity);
         return DiagnosticFactory.createDiagnostic(diagnosticInfo, location);
+    }
+
+    /**
+     * Quotes curly braces so that they survive diagnostic rendering.
+     *
+     * <p>{@code Diagnostic.message()} runs the stored message through {@code MessageFormat}, which treats
+     * {@code {} } as an argument reference and throws when it cannot parse one — aborting the compilation
+     * rather than merely garbling the text. An interpolated type signature can legitimately contain braces
+     * (an inline {@code record {| ... |}} parameter, for instance), so every brace is wrapped in the
+     * {@code MessageFormat} literal-quoting form, which renders back as a plain brace.
+     *
+     * @param message the formatted diagnostic message
+     * @return the message with every curly brace quoted
+     */
+    private static String escapeBraces(String message) {
+        if (message.indexOf('{') < 0 && message.indexOf('}') < 0) {
+            return message;
+        }
+        return message.replace("{", "'{'").replace("}", "'}'");
     }
 
     public static boolean validateModuleId(ModuleSymbol moduleSymbol) {
@@ -153,11 +174,32 @@ public final class PluginUtils {
         return Optional.ofNullable(parameterSymbol.typeDescriptor());
     }
 
+    /**
+     * Returns the parameter's type as it should appear in a diagnostic.
+     *
+     * <p>Types declared by this module are rendered as {@code smb:FileInfo} rather than using
+     * {@link TypeSymbol#signature()}, which would emit {@code ballerina/smb:1.1.0:FileInfo} and leak the
+     * package version into the message on every release.
+     *
+     * @param parameterNode the parameter whose type is being reported
+     * @param context the syntax node analysis context
+     * @return a displayable type name, or {@code unknown} if the type cannot be resolved
+     */
     public static String getParameterTypeSignature(ParameterNode parameterNode,
                                                    SyntaxNodeAnalysisContext context) {
         return getParameterTypeSymbol(parameterNode, context)
-                .map(TypeSymbol::signature)
+                .map(PluginUtils::getDisplayTypeName)
                 .orElse("unknown");
+    }
+
+    public static String getDisplayTypeName(TypeSymbol typeSymbol) {
+        boolean isSmbType = typeSymbol.getModule().map(PluginUtils::validateModuleId).orElse(false);
+        if (isSmbType) {
+            return typeSymbol.getName()
+                    .map(name -> PluginConstants.PACKAGE_PREFIX + ":" + name)
+                    .orElseGet(typeSymbol::signature);
+        }
+        return typeSymbol.signature();
     }
 
     /**

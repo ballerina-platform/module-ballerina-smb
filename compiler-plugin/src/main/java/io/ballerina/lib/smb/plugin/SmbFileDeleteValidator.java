@@ -61,7 +61,7 @@ public class SmbFileDeleteValidator {
     private void validateParameters(SeparatedNodeList<ParameterNode> parameters) {
         if (parameters.isEmpty()) {
             reportErrorDiagnostic(context, MANDATORY_PARAMETER_NOT_FOUND, functionDefinitionNode.location(),
-                    ON_FILE_DELETE_FUNC, "string");
+                    ON_FILE_DELETE_FUNC, "`string`");
             return;
         }
 
@@ -72,12 +72,14 @@ public class SmbFileDeleteValidator {
 
         ParameterNode firstParameter = parameters.get(0);
         if (!isStringParameter(firstParameter)) {
-            reportErrorDiagnostic(context, INVALID_ON_FILE_DELETE_PARAMETER, firstParameter.location());
+            reportErrorDiagnostic(context, INVALID_ON_FILE_DELETE_PARAMETER, firstParameter.location(),
+                    PluginUtils.getParameterTypeSignature(firstParameter, context));
         }
 
         if (parameters.size() == MAX_PARAM_COUNT &&
                 !PluginUtils.validateCallerParameter(parameters.get(1), context)) {
-            reportErrorDiagnostic(context, INVALID_ON_FILE_DELETE_CALLER_PARAMETER, parameters.get(1).location());
+            reportErrorDiagnostic(context, INVALID_ON_FILE_DELETE_CALLER_PARAMETER, parameters.get(1).location(),
+                    PluginUtils.getParameterTypeSignature(parameters.get(1), context));
         }
     }
 

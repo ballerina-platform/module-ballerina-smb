@@ -31,8 +31,10 @@ import java.util.Optional;
 
 import static io.ballerina.lib.smb.plugin.PluginConstants.CompilationErrors.INVALID_ON_ERROR_FIRST_PARAMETER;
 import static io.ballerina.lib.smb.plugin.PluginConstants.CompilationErrors.INVALID_ON_ERROR_SECOND_PARAMETER;
+import static io.ballerina.lib.smb.plugin.PluginConstants.CompilationErrors.MANDATORY_PARAMETER_NOT_FOUND;
 import static io.ballerina.lib.smb.plugin.PluginConstants.CompilationErrors.ON_ERROR_MUST_BE_REMOTE;
 import static io.ballerina.lib.smb.plugin.PluginConstants.CompilationErrors.TOO_MANY_PARAMETERS_ON_ERROR;
+import static io.ballerina.lib.smb.plugin.PluginConstants.ON_ERROR_FUNC;
 import static io.ballerina.lib.smb.plugin.PluginUtils.reportErrorDiagnostic;
 
 /**
@@ -58,7 +60,8 @@ public class SmbOnErrorValidator {
 
         SeparatedNodeList<ParameterNode> parameters = functionDefinitionNode.functionSignature().parameters();
         if (parameters.isEmpty()) {
-            reportErrorDiagnostic(context, INVALID_ON_ERROR_FIRST_PARAMETER, functionDefinitionNode.location());
+            reportErrorDiagnostic(context, MANDATORY_PARAMETER_NOT_FOUND, functionDefinitionNode.location(),
+                    ON_ERROR_FUNC, "`error` or `smb:Error`");
             return;
         }
 
@@ -71,7 +74,8 @@ public class SmbOnErrorValidator {
 
         if (parameters.size() == MAX_PARAM_COUNT &&
                 !PluginUtils.validateCallerParameter(parameters.get(1), context)) {
-            reportErrorDiagnostic(context, INVALID_ON_ERROR_SECOND_PARAMETER, parameters.get(1).location());
+            reportErrorDiagnostic(context, INVALID_ON_ERROR_SECOND_PARAMETER, parameters.get(1).location(),
+                    PluginUtils.getParameterTypeSignature(parameters.get(1), context));
         }
 
         PluginUtils.validateReturnTypeErrorOrNil(functionDefinitionNode, context);
@@ -80,14 +84,16 @@ public class SmbOnErrorValidator {
     private void validateErrorParameter(ParameterNode parameterNode) {
         Optional<TypeSymbol> paramType = PluginUtils.getParameterTypeSymbol(parameterNode, context);
         if (paramType.isEmpty()) {
-            reportErrorDiagnostic(context, INVALID_ON_ERROR_FIRST_PARAMETER, parameterNode.location());
+            reportErrorDiagnostic(context, INVALID_ON_ERROR_FIRST_PARAMETER, parameterNode.location(),
+                    PluginUtils.getParameterTypeSignature(parameterNode, context));
             return;
         }
 
         SemanticModel semanticModel = context.semanticModel();
         TypeSymbol normalizedParamType = unwrapTypeReference(paramType.get());
         if (!normalizedParamType.subtypeOf(semanticModel.types().ERROR)) {
-            reportErrorDiagnostic(context, INVALID_ON_ERROR_FIRST_PARAMETER, parameterNode.location());
+            reportErrorDiagnostic(context, INVALID_ON_ERROR_FIRST_PARAMETER, parameterNode.location(),
+                    PluginUtils.getDisplayTypeName(paramType.get()));
         }
     }
 

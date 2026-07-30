@@ -53,11 +53,15 @@ import static io.ballerina.lib.smb.plugin.PluginUtils.isRemoteFunction;
 import static io.ballerina.lib.smb.plugin.PluginUtils.reportErrorDiagnostic;
 
 /**
- * Validates the format-specific content handlers of an SMB service.
+ * Validates the `onFile*` content handlers of an SMB service.
  */
 public class SmbContentFunctionValidator {
 
     private static final int MAX_PARAM_COUNT = 3;
+    private static final String QUALIFIED_FILE_INFO =
+            PluginConstants.PACKAGE_PREFIX + ":" + PluginConstants.FILE_INFO;
+    private static final String QUALIFIED_CALLER =
+            PluginConstants.PACKAGE_PREFIX + ":" + PluginConstants.CALLER;
 
     private final SyntaxNodeAnalysisContext context;
     private final FunctionDefinitionNode funcDefinitionNode;
@@ -95,8 +99,8 @@ public class SmbContentFunctionValidator {
         ParameterNode firstParameter = parameters.get(0);
         if (!validateContentParameter(firstParameter)) {
             reportErrorDiagnostic(context, INVALID_CONTENT_PARAMETER_TYPE, firstParameter.location(),
-                    contentMethodName, getExpectedContentType(),
-                    PluginUtils.getParameterTypeSignature(firstParameter, context));
+                    PluginUtils.getParameterTypeSignature(firstParameter, context), contentMethodName,
+                    getExpectedContentType());
         }
 
         // The listener resolves the optional parameters by type rather than by position, so
@@ -108,17 +112,18 @@ public class SmbContentFunctionValidator {
             if (PluginUtils.validateFileInfoParameter(parameter, context)) {
                 if (fileInfoSeen) {
                     reportErrorDiagnostic(context, DUPLICATE_OPTIONAL_PARAMETER, parameter.location(),
-                            contentMethodName, PluginConstants.FILE_INFO);
+                            QUALIFIED_FILE_INFO, contentMethodName);
                 }
                 fileInfoSeen = true;
             } else if (PluginUtils.validateCallerParameter(parameter, context)) {
                 if (callerSeen) {
                     reportErrorDiagnostic(context, DUPLICATE_OPTIONAL_PARAMETER, parameter.location(),
-                            contentMethodName, PluginConstants.CALLER);
+                            QUALIFIED_CALLER, contentMethodName);
                 }
                 callerSeen = true;
             } else {
-                reportErrorDiagnostic(context, INVALID_OPTIONAL_PARAMETER, parameter.location(), contentMethodName);
+                reportErrorDiagnostic(context, INVALID_OPTIONAL_PARAMETER, parameter.location(),
+                        PluginUtils.getParameterTypeSignature(parameter, context), contentMethodName);
             }
         }
     }
@@ -198,14 +203,21 @@ public class SmbContentFunctionValidator {
         return referredType != null && referredType.typeKind() == RECORD;
     }
 
+    /**
+     * Returns the accepted content types for this handler, already wrapped in backticks.
+     *
+     * <p>Must not contain curly braces: the text is interpolated into a diagnostic and rendered through
+     * {@code MessageFormat}, which throws on a brace it cannot parse. Hence "a record type" and not
+     * {@code record{}}.
+     */
     private String getExpectedContentType() {
         return switch (contentMethodName) {
-            case ON_FILE_FUNC -> "byte[] or stream<byte[], error?>";
-            case ON_FILE_TEXT_FUNC -> "string";
-            case ON_FILE_JSON_FUNC -> "json or record{}";
-            case ON_FILE_XML_FUNC -> "xml or record{}";
-            case ON_FILE_CSV_FUNC ->
-                    "string[][], record{}[], stream<string[], error?>, or stream<record{}, error?>";
+            case ON_FILE_FUNC -> "`byte[]` or `stream<byte[], error?>`";
+            case ON_FILE_TEXT_FUNC -> "`string`";
+            case ON_FILE_JSON_FUNC -> "`json` or a record type";
+            case ON_FILE_XML_FUNC -> "`xml` or a record type";
+            case ON_FILE_CSV_FUNC -> "`string[][]`, a record array, `stream<string[], error?>` "
+                    + "or a stream of records";
             default -> "unknown";
         };
     }
