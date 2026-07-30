@@ -64,7 +64,7 @@ public final class PluginUtils {
 
     public static Diagnostic getDiagnostic(CompilationErrors error, DiagnosticSeverity severity, Location location) {
         DiagnosticInfo diagnosticInfo = new DiagnosticInfo(error.getErrorCode(),
-                escapeBraces(error.getError()), severity);
+                escapeMessageFormatChars(error.getError()), severity);
         return DiagnosticFactory.createDiagnostic(diagnosticInfo, location);
     }
 
@@ -72,27 +72,34 @@ public final class PluginUtils {
                                            Object... args) {
         String errorMessage = String.format(error.getError(), args);
         DiagnosticInfo diagnosticInfo = new DiagnosticInfo(error.getErrorCode(),
-                escapeBraces(errorMessage), severity);
+                escapeMessageFormatChars(errorMessage), severity);
         return DiagnosticFactory.createDiagnostic(diagnosticInfo, location);
     }
 
     /**
-     * Quotes curly braces so that they survive diagnostic rendering.
+     * Escapes a diagnostic message so that it survives rendering intact.
      *
-     * <p>{@code Diagnostic.message()} runs the stored message through {@code MessageFormat}, which treats
-     * {@code {} } as an argument reference and throws when it cannot parse one — aborting the compilation
-     * rather than merely garbling the text. An interpolated type signature can legitimately contain braces
-     * (an inline {@code record {| ... |}} parameter, for instance), so every brace is wrapped in the
-     * {@code MessageFormat} literal-quoting form, which renders back as a plain brace.
+     * <p>{@code Diagnostic.message()} runs the stored message through {@code MessageFormat}, which gives
+     * two characters special meaning. A brace is read as an argument reference, and an unparseable one
+     * throws — aborting the compilation rather than merely garbling the text. A single quote opens a
+     * literal-quoting section and is itself dropped.
+     *
+     * <p>Both can legitimately appear in an interpolated type signature: an inline
+     * {@code record {| ... |}} parameter carries braces, and a Ballerina quoted identifier such as
+     * {@code 'limit} carries an apostrophe.
+     *
+     * <p>Order matters. Apostrophes are doubled first, since that is how {@code MessageFormat} spells a
+     * literal quote; the braces are only then wrapped in quoting of our own. Doing it the other way round
+     * would double the quotes this method just added and corrupt the escaping.
      *
      * @param message the formatted diagnostic message
-     * @return the message with every curly brace quoted
+     * @return the message with apostrophes and curly braces escaped
      */
-    private static String escapeBraces(String message) {
-        if (message.indexOf('{') < 0 && message.indexOf('}') < 0) {
-            return message;
-        }
-        return message.replace("{", "'{'").replace("}", "'}'");
+    private static String escapeMessageFormatChars(String message) {
+        return message
+                .replace("'", "''")
+                .replace("{", "'{'")
+                .replace("}", "'}'");
     }
 
     public static boolean validateModuleId(ModuleSymbol moduleSymbol) {

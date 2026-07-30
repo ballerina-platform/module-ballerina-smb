@@ -220,6 +220,16 @@ public class SmbServiceValidationTest {
                         + "allowed as the optional parameter");
     }
 
+    @Test(description = "A quoted identifier's apostrophe survives diagnostic rendering")
+    public void testQuotedIdentifierMessagesRender() {
+        assertErrors("invalid_quoted_identifier", INVALID_CONTENT_PARAMETER_TYPE, INVALID_OPTIONAL_PARAMETER);
+        assertMessages("invalid_quoted_identifier",
+                "invalid parameter type `record {|int 'limit;|}` provided for the `onFileText` method, "
+                        + "expected `string`",
+                "invalid parameter type `record {|string 'from;|}` provided for the `onFileJson` method, only "
+                        + "`smb:FileInfo` and `smb:Caller` are allowed as optional parameters");
+    }
+
     @Test(description = "A type signature containing curly braces renders instead of aborting compilation")
     public void testBraceTypeMessagesRender() {
         assertMessages("invalid_content_service_6",
