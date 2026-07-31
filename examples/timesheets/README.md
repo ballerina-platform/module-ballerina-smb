@@ -1,8 +1,8 @@
-## Timesheets validation via SMB server
+# Timesheet validation via an SMB share
 
 This example validates contractor timesheet CSV files placed on an SMB share. It monitors the incoming directory, validates each CSV against expected counts and thresholds, then moves valid files to the processed directory while writing cleaned data to the validated directory, or quarantines invalid files with detailed error logs.
 
-### Prerequisites
+## Prerequisites
 
 You will need to have the following directories added to the SMB share first.
 
@@ -12,7 +12,7 @@ You will need to have the following directories added to the SMB share first.
 - `/timesheets/quarantine` - Invalid files are moved here with error details
 - `/timesheets/validated` - Cleaned and validated CSV data is written here
 
-### Configure
+## Configure
 
 Update `Config.toml` with your SMB credentials.
 
