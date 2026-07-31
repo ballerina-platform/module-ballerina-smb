@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - [Review the API documentation and restructure the READMEs around the listener and the SMB service contract](https://github.com/ballerina-platform/ballerina-library/issues/8608)
 
+### Fixed
+
+- [Resolve the service handler methods and the `smb:Caller` when the service is attached, instead of once per file event, so that the listener no longer leaks an SMB connection per dispatch](https://github.com/ballerina-platform/ballerina-library/issues/8966)
+
 ### Removed
 
 - Remove the unused public types `SocketConfig`, `InputContent`, `FileAgeFilter`, `AgeCalculationMode`, `FileDependencyCondition`, `DependencyMatchingMode`, and `Compression`, which described behaviour the module does not implement
