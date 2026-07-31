@@ -14,8 +14,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import ballerina/io;
-
 # NTLMv2 credentials for connecting to an SMB share.
 #
 # + username - Username for SMB authentication
@@ -45,74 +43,4 @@ public type KerberosConfig record {|
 public type AuthConfiguration record {|
     Credentials credentials?;
     KerberosConfig kerberosConfig?;
-|};
-
-# Socket timeout configurations.
-#
-# + dataTimeout - Data transfer timeout in seconds
-# + socketTimeout - Socket operation timeout in seconds
-# + sessionTimeout - SMB session timeout in seconds
-public type SocketConfig record {|
-    decimal dataTimeout = 120.0;
-    decimal socketTimeout = 60.0;
-    decimal sessionTimeout = 300.0;
-|};
-
-# Internal configuration for content to be written in put and append operations.
-#
-# + filePath - Path of the file to be created or appended
-# + isFile - `true` if the input type is a file stream
-# + fileContent - The content read from the input file stream
-# + textContent - The input content as text
-# + compressInput - If `true`, input will be compressed before uploading
-public type InputContent record {|
-    string filePath;
-    boolean isFile = false;
-    stream<byte[] & readonly, io:Error?> fileContent?;
-    string textContent?;
-    boolean compressInput = false;
-|};
-
-# Timestamp used when calculating the age of a file.
-#
-# LAST_MODIFIED - The file's last modified timestamp
-# CREATION_TIME - The file's creation timestamp, where the file system supports it
-public enum AgeCalculationMode {
-    LAST_MODIFIED,
-    CREATION_TIME
-}
-
-# Restricts file events to files within a given age range.
-#
-# + minAge - Minimum age of the file in seconds, inclusive. Younger files are skipped
-# + maxAge - Maximum age of the file in seconds, inclusive. Older files are skipped
-# + ageCalculationMode - Timestamp to measure the file's age from
-public type FileAgeFilter record {|
-    decimal minAge?;
-    decimal maxAge?;
-    AgeCalculationMode ageCalculationMode = LAST_MODIFIED;
-|};
-
-# How many of the required files must be present for a dependency to be satisfied.
-#
-# ALL - Every required file pattern must have at least one match
-# ANY - At least one required file pattern must have a match
-# EXACT_COUNT - The number of matches must equal `requiredFileCount`
-public enum DependencyMatchingMode {
-    ALL,
-    ANY,
-    EXACT_COUNT
-}
-
-# Delays processing of a file until the files it depends on are present on the share.
-#
-# + targetPattern - Regular expression for the files processed conditionally
-# + requiredFiles - File patterns that must exist. Capture groups from `targetPattern` can be referenced as `$1`
-# + matchingMode - How many of the required files must be present
-# + requiredFileCount - Number of matches expected in the `EXACT_COUNT` mode
-public type FileDependencyCondition record {|
-    string targetPattern;
-    string[] requiredFiles;
-    DependencyMatchingMode matchingMode = ALL;
-    int requiredFileCount = 1;
 |};

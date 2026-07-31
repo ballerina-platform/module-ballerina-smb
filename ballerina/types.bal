@@ -54,15 +54,6 @@ public enum FileWriteOption {
     APPEND
 }
 
-# Compression applied to file uploads.
-#
-# ZIP - Zip compression
-# NONE - No compression
-public enum Compression {
-    ZIP,
-    NONE
-}
-
 # SMB protocol dialect used to communicate with the server.
 #
 # SMB_3_1_1 - SMB 3.1.1
