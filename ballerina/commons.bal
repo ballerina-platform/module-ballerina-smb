@@ -16,11 +16,11 @@
 
 import ballerina/io;
 
-# SMB authentication credentials for connecting to SMB shares.
+# NTLMv2 credentials for connecting to an SMB share.
 #
 # + username - Username for SMB authentication
 # + password - Password for SMB authentication
-# + domain - Optional domain for domain-based authentication
+# + domain - Domain for domain-based authentication
 public type Credentials record {|
     string username;
     string password;
@@ -29,29 +29,29 @@ public type Credentials record {|
 
 # Kerberos authentication configuration.
 #
-# + principal - Kerberos principal name in user@REALM format (e.g., user@EXAMPLE.COM)
-# + keytab - Path to the keytab file for authentication (optional, uses password if not provided)
-# + configFile - Path to the Kerberos configuration file (krb5.conf)
+# + principal - Kerberos principal name in the `user@REALM` format
+# + keytab - Path to the keytab file. The password is used when this is not provided
+# + configFile - Path to the Kerberos configuration file (`krb5.conf`)
 public type KerberosConfig record {|
     string principal;
     string keytab?;
     string configFile?;
 |};
 
-# Specifies authentication options for SMB server connections. Supports both NTLMv2 and Kerberos authentication.
+# Authentication options for an SMB connection. Provide either NTLMv2 credentials or a Kerberos configuration.
 #
-# + credentials - Username, password, and optional domain for authentication
-# + kerberosConfig - Additional configurations for Kerberos authentication
+# + credentials - NTLMv2 credentials
+# + kerberosConfig - Kerberos configuration
 public type AuthConfiguration record {|
     Credentials credentials?;
     KerberosConfig kerberosConfig?;
 |};
 
-# Socket timeout configurations
+# Socket timeout configurations.
 #
-# + dataTimeout - Data transfer timeout in seconds (default: 120.0)
-# + socketTimeout - Socket operation timeout in seconds (default: 60.0)
-# + sessionTimeout - SMB session timeout in seconds (default: 300.0)
+# + dataTimeout - Data transfer timeout in seconds
+# + socketTimeout - Socket operation timeout in seconds
+# + sessionTimeout - SMB session timeout in seconds
 public type SocketConfig record {|
     decimal dataTimeout = 120.0;
     decimal socketTimeout = 60.0;
@@ -73,48 +73,43 @@ public type InputContent record {|
     boolean compressInput = false;
 |};
 
-# Determines the timestamp used when calculating file age for filtering.
+# Timestamp used when calculating the age of a file.
 #
-# LAST_MODIFIED - Use file's last modified timestamp (default)
-# CREATION_TIME - Use file's creation timestamp (where supported by file system)
+# LAST_MODIFIED - The file's last modified timestamp
+# CREATION_TIME - The file's creation timestamp, where the file system supports it
 public enum AgeCalculationMode {
     LAST_MODIFIED,
     CREATION_TIME
 }
 
-# Filters files based on their age to control which files trigger listener events.
-# Useful for processing only files within a specific age range (e.g., skip very new files or very old files).
+# Restricts file events to files within a given age range.
 #
-# + minAge - Minimum age of file in seconds since last modification/creation (inclusive).
-#            Files younger than this will be skipped. If not specified, no minimum age requirement.
-# + maxAge - Maximum age of file in seconds since last modification/creation (inclusive).
-#            Files older than this will be skipped. If not specified, no maximum age requirement.
-# + ageCalculationMode - Whether to calculate age based on last modified time or creation time
+# + minAge - Minimum age of the file in seconds, inclusive. Younger files are skipped
+# + maxAge - Maximum age of the file in seconds, inclusive. Older files are skipped
+# + ageCalculationMode - Timestamp to measure the file's age from
 public type FileAgeFilter record {|
     decimal minAge?;
     decimal maxAge?;
     AgeCalculationMode ageCalculationMode = LAST_MODIFIED;
 |};
 
-# Determines how to match required files when evaluating file dependencies.
-# Controls whether all dependencies must be present, at least one, or a specific count.
-# ALL - All required file patterns must have at least one matching file (default)
-# ANY - At least one required file pattern must have a matching file
-# EXACT_COUNT - Exact number of required files must match (count specified in requiredFileCount)
+# How many of the required files must be present for a dependency to be satisfied.
+#
+# ALL - Every required file pattern must have at least one match
+# ANY - At least one required file pattern must have a match
+# EXACT_COUNT - The number of matches must equal `requiredFileCount`
 public enum DependencyMatchingMode {
     ALL,
     ANY,
     EXACT_COUNT
 }
 
-# Defines a dependency condition where processing of target files depends on the existence of other files.
-# This allows conditional file processing based on the presence of related files (e.g., processing a data file only
-# when a corresponding marker file exists). Supports capture group substitution to dynamically match related files.
+# Delays processing of a file until the files it depends on are present on the share.
 #
-# + targetPattern - Regex pattern for files that should be processed conditionally
-# + requiredFiles - Array of file patterns that must exist. Supports capture group substitution (e.g., "$1")
-# + matchingMode - How to match required files (ALL, ANY, or EXACT_COUNT)
-# + requiredFileCount - For EXACT_COUNT mode, specifies the exact number of required files
+# + targetPattern - Regular expression for the files processed conditionally
+# + requiredFiles - File patterns that must exist. Capture groups from `targetPattern` can be referenced as `$1`
+# + matchingMode - How many of the required files must be present
+# + requiredFileCount - Number of matches expected in the `EXACT_COUNT` mode
 public type FileDependencyCondition record {|
     string targetPattern;
     string[] requiredFiles;

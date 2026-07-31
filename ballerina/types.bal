@@ -16,21 +16,20 @@
 
 import ballerina/time;
 
-# Configuration for SMB client.
+# Configuration for the SMB client.
 #
 # + host - Target SMB server hostname or IP address
 # + share - SMB share name to connect to
-# + port - Port number of the SMB service (default: 445)
-# + auth - Authentication credentials for SMB connection
-# + dialects - Supported SMB protocol dialects
-# + signRequired - Whether SMB message signing is required (default: false)
-# + encryptData - Whether to encrypt SMB data (default: false)
-# + enableDfs - Whether to enable Distributed File System support (default: false)
+# + port - Port number of the SMB service
+# + auth - Authentication credentials for the SMB connection
+# + dialects - SMB protocol dialects to negotiate with, in order of preference
+# + signRequired - Whether SMB message signing is required
+# + encryptData - Whether to encrypt SMB data
+# + enableDfs - Whether to enable Distributed File System (DFS) support
 # + bufferSize - Size of the buffer for read/write operations in bytes
-# + connectTimeout - Connection timeout in seconds (default: 30.0)
-# + laxDataBinding - If set to `true`, enables relaxed data binding for XML, JSON, and CSV responses (default: false)
-# + csvFailSafe - Configuration for fail-safe CSV content processing. In the fail-safe mode,
-#                 malformed CSV records are skipped and written to a separate file in the current directory
+# + connectTimeout - Connection timeout in seconds
+# + laxDataBinding - Whether to relax data binding for XML, JSON, and CSV content
+# + csvFailSafe - Skips malformed CSV records and logs them to a file instead of failing the operation
 public type ClientConfiguration record {|
     string host = "localhost";
     int port = 445;
@@ -46,15 +45,17 @@ public type ClientConfiguration record {|
     FailSafeOptions csvFailSafe?;
 |};
 
-# File write options for write operations.
-# OVERWRITE - Overwrite the existing file content
-# APPEND - Append to the existing file content
+# How content is written to an existing file.
+#
+# OVERWRITE - Replace the existing file content
+# APPEND - Add to the end of the existing file content
 public enum FileWriteOption {
     OVERWRITE,
     APPEND
 }
 
-# Compression type for file uploads.
+# Compression applied to file uploads.
+#
 # ZIP - Zip compression
 # NONE - No compression
 public enum Compression {
@@ -62,11 +63,18 @@ public enum Compression {
     NONE
 }
 
+# SMB protocol dialect used to communicate with the server.
+#
+# SMB_3_1_1 - SMB 3.1.1
+# SMB_3_0_2 - SMB 3.0.2
+# SMB_3_0 - SMB 3.0
+# SMB_2_1 - SMB 2.1
+# SMB_2_0_2 - SMB 2.0.2
 public enum Dialect {
-    SMB_3_1_1, 
+    SMB_3_1_1,
     SMB_3_0_2,
-    SMB_3_0, 
-    SMB_2_1, 
+    SMB_3_0,
+    SMB_2_1,
     SMB_2_0_2
 };
 
@@ -106,18 +114,17 @@ public type FileInfo record {|
 # + host - Target SMB server hostname or IP address
 # + port - Port number of the SMB service (default: 445)
 # + share - SMB share name to connect to
-# + auth - Authentication options for connecting to the server
-# + fileNamePattern - File name pattern (regex) to filter which files trigger events (optional)
-# + pollingInterval - Polling interval in seconds for checking file changes (default: 60)
-# + dialects - Supported SMB protocol dialects (default: all versions from SMB 2.0.2 to 3.1.1)
-# + signRequired - Whether SMB message signing is required (default: false)
-# + encryptData - Whether to encrypt SMB data (default: false)
-# + enableDfs - Whether to enable Distributed File System support (default: false)
-# + bufferSize - Size of the buffer for read/write operations in bytes (default: 65536)
-# + connectTimeout - Connection timeout in seconds (default: 30.0)
-# + laxDataBinding - If set to `true`, enables relaxed data binding for XML and JSON responses (default: false)
-# + csvFailSafe - Configuration for fail-safe CSV content processing. In the fail-safe mode,
-#                 malformed CSV records are skipped and written to a separate file in the current directory
+# + auth - Authentication credentials for the SMB connection
+# + fileNamePattern - Regular expression a file name must match to trigger a handler
+# + pollingInterval - Interval in seconds between polls of the watched directory
+# + dialects - SMB protocol dialects to negotiate with, in order of preference
+# + signRequired - Whether SMB message signing is required
+# + encryptData - Whether to encrypt SMB data
+# + enableDfs - Whether to enable Distributed File System (DFS) support
+# + bufferSize - Size of the buffer for read/write operations in bytes
+# + connectTimeout - Connection timeout in seconds
+# + laxDataBinding - Whether to relax data binding for XML, JSON, and CSV content
+# + csvFailSafe - Skips malformed CSV records and logs them to a file instead of failing the operation
 public type ListenerConfiguration record {|
     string host = "localhost";
     int port = 445;
@@ -135,44 +142,38 @@ public type ListenerConfiguration record {|
     FailSafeOptions csvFailSafe?;
 |};
 
-# Delete action for file post-processing.
-# When specified, the file will be deleted after processing.
+# Post-processing action that deletes the file.
 public const DELETE = "DELETE";
 
-# Configuration for moving a file after processing.
+# Post-processing action that moves the file to another directory.
 #
-# + moveTo - Destination directory path where the file will be moved
-# + preserveSubDirs - If `true`, preserves the subdirectory structure relative to the listener's root path
+# + moveTo - Destination directory path within the share
+# + preserveSubDirs - Whether to recreate the file's subdirectory structure under the destination
 public type Move record {|
     string moveTo;
     boolean preserveSubDirs = true;
 |};
 
-# Type alias for `Move` record, used in union types for post-processing actions.
+# Alias for the `Move` record, used in post-processing action unions.
 public type MOVE Move;
 
-# Configuration annotation for SMB content handler functions.
-# This annotation can be used to specify custom file name patterns for content handler methods
-# and what actions to perform after processing.
+# Configuration for a single SMB content handler method.
 #
-# + fileNamePattern - Regular expression pattern to match file names (e.g., "(.*).txt", "data_(.*).json")
-# + afterProcess - Action to perform after successful processing. Can be `DELETE` or `MOVE`.
-#                  If not specified, no action is taken (file remains in place)
-# + afterError - Action to perform after a processing error. Can be `DELETE` or `MOVE`.
-#                If not specified, no action is taken (file remains in place)
+# + fileNamePattern - Regular expression a file name must match for this handler to run
+# + afterProcess - Action to take once the handler completes successfully. The file stays in place if not specified
+# + afterError - Action to take when the handler fails. The file stays in place if not specified
 public type FunctionConfiguration record {|
     string fileNamePattern?;
     MOVE|DELETE afterProcess?;
     MOVE|DELETE afterError?;
 |};
 
-# Annotation to configure content handler function behavior.
+# The annotation to configure an SMB content handler method.
 public annotation FunctionConfiguration FunctionConfig on service remote function;
 
-# Provides a set of configurations for the SMB service.
+# Configuration for an SMB service.
 #
-# + path - The directory path within the SMB share that this service should listen to.
-#          If not specified, the service name will be used as the path.
+# + path - Directory within the share to watch. Defaults to the service name
 public type SmbServiceConfig record {|
     string path?;
 |};
@@ -180,8 +181,7 @@ public type SmbServiceConfig record {|
 # The annotation to configure an SMB service.
 public annotation SmbServiceConfig ServiceConfig on service;
 
-# SMB service for handling file system change events.
-#
+# Represents an SMB service that handles file events from an `smb:Listener`.
 public type Service service object {
 };
 
@@ -208,12 +208,16 @@ public type ContentCsvRecordStreamEntry record {|
 
 # Fail-safe options for CSV content processing.
 #
-# + contentType - Specifies the type of content to log in case of errors
+# + contentType - What to record in the error log for each skipped record
 public type FailSafeOptions record {|
     ErrorLogContentType contentType = METADATA;
 |};
 
-# Specifies the type of content to log in case of errors during fail-safe CSV processing.
+# What is recorded for a CSV record skipped during fail-safe processing.
+#
+# METADATA - The record's position and the reason it was skipped
+# RAW - The raw text of the record
+# RAW_AND_METADATA - Both the raw text and the metadata
 public enum ErrorLogContentType {
     METADATA,
     RAW,

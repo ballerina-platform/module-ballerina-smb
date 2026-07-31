@@ -14,14 +14,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-# SMB caller for interacting with SMB servers from within file handlers.
-# Provides a convenience wrapper around the Client class with simplified method signatures.
+# Provides access to the SMB share from within a service's remote methods.
+# It offers the same operations as `smb:Client`, except that the `get*` operations do not bind to a target type.
 public isolated client class Caller {
     private final Client 'client;
 
     # Gets invoked during object initialization.
     #
-    # + 'client - The `smb:Client` which is used to interact with the SMB server
+    # + 'client - The `smb:Client` used to interact with the SMB server
     isolated function init(Client 'client) {
         self.'client = 'client;
     }
@@ -40,9 +40,8 @@ public isolated client class Caller {
         return self.'client->putBytes(path, content, option);
     }
 
-    # Patches a file by writing byte array content at a specified offset on an SMB share.
-    # This allows writing to an arbitrary position in a file without overwriting
-    # the entire file or appending to the end.
+    # Writes byte array content at a byte offset in a file on an SMB share,
+    # leaving the rest of the file untouched.
     # ```ballerina
     # smb:Error? response = caller->patch(path, content, 100);
     # ```
@@ -199,7 +198,7 @@ public isolated client class Caller {
     # ```
     #
     # + path - The directory path
-    # + return - An array of FileInfo records or an `smb:Error` if failed to establish the communication with the SMB server
+    # + return - Metadata for each file and directory in the given path, or an `smb:Error` if the operation fails
     remote isolated function list(string path) returns FileInfo[]|Error {
         return self.'client->list(path);
     }
@@ -210,7 +209,7 @@ public isolated client class Caller {
     # ```
     #
     # + path - The directory path
-    # + return - `()` or else an `smb:Error` if failed to establish the communication with the SMB server
+    # + return - `()` or else an `smb:Error` if the operation fails
     remote isolated function mkdir(string path) returns Error? {
         return self.'client->mkdir(path);
     }
@@ -221,7 +220,7 @@ public isolated client class Caller {
     # ```
     #
     # + path - The directory path
-    # + return - `()` or else an `smb:Error` if failed to establish the communication with the SMB server
+    # + return - `()` or else an `smb:Error` if the operation fails
     remote isolated function rmdir(string path) returns Error? {
         return self.'client->rmdir(path);
     }
@@ -233,7 +232,7 @@ public isolated client class Caller {
     #
     # + origin - The source file location
     # + destination - The destination file location
-    # + return - `()` or else an `smb:Error` if failed to establish the communication with the SMB server
+    # + return - `()` or else an `smb:Error` if the operation fails
     remote isolated function rename(string origin, string destination) returns Error? {
         return self.'client->rename(origin, destination);
     }
@@ -245,7 +244,7 @@ public isolated client class Caller {
     #
     # + sourcePath - The source file location
     # + destinationPath - The destination file location
-    # + return - `()` or else an `smb:Error` if failed to establish the communication with the SMB server
+    # + return - `()` or else an `smb:Error` if the operation fails
     remote isolated function move(string sourcePath, string destinationPath) returns Error? {
         return self.'client->move(sourcePath, destinationPath);
     }
@@ -257,7 +256,7 @@ public isolated client class Caller {
     #
     # + sourcePath - The source file location
     # + destinationPath - The destination file location
-    # + return - `()` or else an `smb:Error` if failed to establish the communication with the SMB server
+    # + return - `()` or else an `smb:Error` if the operation fails
     remote isolated function copy(string sourcePath, string destinationPath) returns Error? {
         return self.'client->copy(sourcePath, destinationPath);
     }
@@ -268,7 +267,7 @@ public isolated client class Caller {
     # ```
     #
     # + path - The resource path
-    # + return - `true` if the file or directory exists, `false` otherwise, or an `smb:Error` if failed to establish the communication with the SMB server
+    # + return - `true` if the file or directory exists, `false` otherwise, or an `smb:Error` if the operation fails
     remote isolated function exists(string path) returns boolean|Error {
         return self.'client->exists(path);
     }
@@ -279,7 +278,7 @@ public isolated client class Caller {
     # ```
     #
     # + path - The resource path
-    # + return - The file size in bytes or an `smb:Error` if failed to establish the communication with the SMB server
+    # + return - The file size in bytes or an `smb:Error` if the operation fails
     remote isolated function size(string path) returns int|Error {
         return self.'client->size(path);
     }
@@ -301,7 +300,7 @@ public isolated client class Caller {
     # ```
     #
     # + path - The resource path
-    # + return - `()` or else an `smb:Error` if failed to establish the communication with the SMB server
+    # + return - `()` or else an `smb:Error` if the operation fails
     remote isolated function delete(string path) returns Error? {
         return self.'client->delete(path);
     }
@@ -311,7 +310,7 @@ public isolated client class Caller {
     # smb:Error? response = caller->close();
     # ```
     #
-    # + return - `()` or else an `smb:Error` if failed to close the connection
+    # + return - `()` or else an `smb:Error` if the connection cannot be closed
     remote isolated function close() returns Error? {
         return self.'client->close();
     }
