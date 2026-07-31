@@ -19,7 +19,7 @@ The module supports SMB dialects `2.0.2` through `3.1.1`, NTLMv2 and Kerberos au
 | `smb:Listener` | Poll a directory on a share and dispatch each added or deleted file to a service. |
 | `smb:Caller` | The share connection made available to a service, so a handler can act on the share while processing a file. |
 
-All paths are relative to the configured share. For the complete set of operations, records, and their parameters, see the [`smb` API documentation](https://central.ballerina.io/ballerina/smb/latest).
+All paths are relative to the configured share.
 
 ## Quickstart
 
@@ -311,7 +311,7 @@ The `smb` module provides practical examples illustrating usage in various scena
 
    > **Note**: Ensure that the Docker daemon is running before executing any tests.
 
-4. Export GitHub personal access token with read package permissions as follows,
+4. Export a GitHub personal access token with read package permissions as follows:
 
     ```bash
     export packageUser=<Username>
