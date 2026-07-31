@@ -27,7 +27,7 @@ public class PostProcessAction {
     /**
      * The kind of post-processing to perform.
      */
-    public enum ActionType {
+    private enum ActionType {
         DELETE,
         MOVE
     }
@@ -62,10 +62,6 @@ public class PostProcessAction {
         return new PostProcessAction(ActionType.MOVE, moveTo, preserveSubDirs);
     }
 
-    public ActionType getActionType() {
-        return actionType;
-    }
-
     public String getMoveTo() {
         return moveTo;
     }
@@ -76,17 +72,5 @@ public class PostProcessAction {
 
     public boolean isDelete() {
         return actionType == ActionType.DELETE;
-    }
-
-    public boolean isMove() {
-        return actionType == ActionType.MOVE;
-    }
-
-    @Override
-    public String toString() {
-        if (isDelete()) {
-            return "DELETE";
-        }
-        return "MOVE{moveTo='" + moveTo + "', preserveSubDirs=" + preserveSubDirs + "}";
     }
 }

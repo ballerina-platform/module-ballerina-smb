@@ -208,15 +208,13 @@ public class SmbListenerHelper {
             String path = normalizePath(getServicePath(smbService, name));
             FormatMethodsHolder formatMethodsHolder = new FormatMethodsHolder(smbService,
                     (FileNamePattern) listenerEndpoint.getNativeData(LISTENER_FILE_NAME_PATTERN));
-            ServiceContext context = new ServiceContext(smbService, path, formatMethodsHolder, null);
             if (formatMethodsHolder.needsCaller()) {
                 Object caller = getOrCreateCaller(listenerEndpoint);
                 if (caller instanceof BError) {
                     return caller;
                 }
-                context.setCaller((BObject) caller);
             }
-            services.add(context);
+            services.add(new ServiceContext(smbService, path, formatMethodsHolder));
             return null;
         } catch (Exception e) {
             return SmbUtil.createError(REGISTER_SERVICE_ERROR + e.getMessage(), SMB_ERROR);
@@ -315,20 +313,26 @@ public class SmbListenerHelper {
 
     public static Object poll(Environment env, BObject listenerEndpoint) {
         return env.yieldAndRun(() -> {
-            // Read inside the try so a failing lookup still becomes a polling error reported through onError,
-            // rather than escaping as a panic.
+            // Declared out here so the catch can hand the caller to onError, but read inside the try so a
+            // failing lookup still becomes a polling error rather than escaping as a panic.
+            ListenerContext listenerContext = null;
             try {
-                BMap<BString, Object> config =
-                        (BMap<BString, Object>) listenerEndpoint.getNativeData(SMB_SERVICE_ENDPOINT_CONFIG);
-                checkForFileChanges(env, listenerEndpoint, config);
+                listenerContext = readListenerContext(listenerEndpoint);
+                checkForFileChanges(env, listenerEndpoint, listenerContext);
                 return null;
             } catch (Exception e) {
                 List<ServiceContext> services =
                     (List<ServiceContext>) listenerEndpoint.getNativeData(LISTENER_SERVICES);
-                notifyServicesOnError(env, services, e);
+                notifyServicesOnError(env, services, e, listenerContext);
                 return SmbUtil.createError(POLLING_ERROR + e.getMessage(), SMB_ERROR);
             }
         });
+    }
+
+    private static ListenerContext readListenerContext(BObject listenerEndpoint) {
+        return new ListenerContext(
+                (BMap<BString, Object>) listenerEndpoint.getNativeData(SMB_SERVICE_ENDPOINT_CONFIG),
+                (BObject) listenerEndpoint.getNativeData(LISTENER_CALLER));
     }
 
     public static Object cleanup(BObject listenerEndpoint) throws Exception {
@@ -348,8 +352,8 @@ public class SmbListenerHelper {
     }
 
     private static void checkForFileChanges(Environment env, BObject listenerEndpoint,
-                                            BMap<BString, Object> config) throws Exception {
-        DiskShare diskShare = getOrCreateDiskShare(listenerEndpoint, config);
+                                            ListenerContext listenerContext) throws Exception {
+        DiskShare diskShare = getOrCreateDiskShare(listenerEndpoint, listenerContext.config());
         List<ServiceContext> services =
                 (List<ServiceContext>) listenerEndpoint.getNativeData(LISTENER_SERVICES);
         if (services == null || services.isEmpty()) {
@@ -361,7 +365,7 @@ public class SmbListenerHelper {
             pathsToMonitor.add(context.getPath());
         }
         for (String path : pathsToMonitor) {
-            checkPathForChanges(env, listenerEndpoint, diskShare, path, serviceContexts, config);
+            checkPathForChanges(env, listenerEndpoint, diskShare, path, serviceContexts, listenerContext);
         }
     }
 
@@ -457,7 +461,7 @@ public class SmbListenerHelper {
 
     private static void checkPathForChanges(Environment env, BObject listenerEndpoint, DiskShare diskShare,
                                            String path, List<ServiceContext> allServices,
-                                           BMap<BString, Object> listenerConfig) {
+                                           ListenerContext listenerContext) {
         Map<String, Set<String>> previousFiles =
                 (Map<String, Set<String>>) listenerEndpoint.getNativeData(LISTENER_PREVIOUS_FILES);
         Set<String> prevFiles = new HashSet<>(previousFiles.getOrDefault(path, new HashSet<>()));
@@ -495,10 +499,10 @@ public class SmbListenerHelper {
 
         previousFiles.put(path, new HashSet<>(currentFiles));
         if (!addedFiles.isEmpty()) {
-            notifyServicesForPath(env, path, addedFiles, allServices, diskShare, listenerConfig);
+            notifyServicesForPath(env, path, addedFiles, allServices, diskShare, listenerContext);
         }
         if (!deletedFiles.isEmpty()) {
-            notifyServicesForDeletedFiles(env, path, deletedFiles, allServices);
+            notifyServicesForDeletedFiles(env, path, deletedFiles, allServices, listenerContext);
         }
     }
 
@@ -577,7 +581,7 @@ public class SmbListenerHelper {
                                               List<BMap<BString, Object>> addedFiles,
                                               List<ServiceContext> allServices,
                                               DiskShare diskShare,
-                                              BMap<BString, Object> listenerConfig) {
+                                              ListenerContext listenerContext) {
         if (allServices == null || allServices.isEmpty()) {
             return;
         }
@@ -596,9 +600,9 @@ public class SmbListenerHelper {
             for (ServiceContext context : servicesToNotify) {
                 try {
                     tryContentHandlers(env, context, filePath, extension, fileInfo, diskShare,
-                            listenerConfig, changedPath);
+                            listenerContext, changedPath);
                 } catch (Exception exception) {
-                    notifyServiceOnError(env, context, exception);
+                    notifyServiceOnError(env, context, exception, listenerContext);
                 }
             }
         }
@@ -606,7 +610,8 @@ public class SmbListenerHelper {
 
     private static void notifyServicesForDeletedFiles(Environment env, String changedPath,
                                                        List<String> deletedFiles,
-                                                       List<ServiceContext> allServices) {
+                                                       List<ServiceContext> allServices,
+                                                       ListenerContext listenerContext) {
         if (allServices == null || allServices.isEmpty()) {
             return;
         }
@@ -621,7 +626,7 @@ public class SmbListenerHelper {
             }
             for (String deletedFile : deletedFiles) {
                 if (handler.matchesFileName(fileNameOf(deletedFile))) {
-                    invokeOnFileDeleteHandler(env, context, handler, deletedFile);
+                    invokeOnFileDeleteHandler(env, context, handler, deletedFile, listenerContext);
                 }
             }
         }
@@ -633,26 +638,28 @@ public class SmbListenerHelper {
     }
 
     private static void invokeOnFileDeleteHandler(Environment env, ServiceContext context, HandlerMethod handler,
-                                                   String deletedFile) {
+                                                   String deletedFile, ListenerContext listenerContext) {
         List<Object> args = new ArrayList<>();
         args.add(StringUtils.fromString(deletedFile));
-        appendCallerIfDeclared(args, handler, context);
+        appendCallerIfDeclared(args, handler, listenerContext);
         try {
             Object result = env.getRuntime().callMethod(context.getService(), ON_FILE_DELETE,
                     new StrandMetadata(handler.isConcurrentSafe(), null), args.toArray());
             if (result instanceof BError bError) {
-                notifyServiceOnError(env, context, new Exception(bError.getErrorMessage().getValue()));
+                notifyServiceOnError(env, context, new Exception(bError.getErrorMessage().getValue()),
+                        listenerContext);
             }
         } catch (Exception e) {
-            notifyServiceOnError(env, context, e);
+            notifyServiceOnError(env, context, e, listenerContext);
         }
     }
 
-    private static void appendCallerIfDeclared(List<Object> args, HandlerMethod handler, ServiceContext context) {
-        if (!handler.declaresCaller()) {
+    private static void appendCallerIfDeclared(List<Object> args, HandlerMethod handler,
+                                               ListenerContext listenerContext) {
+        if (!handler.declaresCaller() || listenerContext == null) {
             return;
         }
-        BObject caller = context.getCaller();
+        BObject caller = listenerContext.caller();
         if (caller != null) {
             args.add(caller);
         }
@@ -660,19 +667,19 @@ public class SmbListenerHelper {
 
     private static void tryContentHandlers(Environment env, ServiceContext context, String filePath,
                                            String extension, BMap<BString, Object> fileInfo,
-                                           DiskShare diskShare, BMap<BString, Object> listenerConfig,
+                                           DiskShare diskShare, ListenerContext listenerContext,
                                            String servicePath) {
         FormatMethodsHolder formatMethodsHolder = context.getFormatMethodsHolder();
         String fileName = fileInfo.getStringValue(NAME).getValue();
         HandlerMethod handler = formatMethodsHolder.getContentMethod(getHandlerMethodForExtension(extension));
         if (handler != null && handler.matchesFileName(fileName)) {
-            invokeContentHandler(env, context, handler, filePath, fileInfo, diskShare, listenerConfig,
+            invokeContentHandler(env, context, handler, filePath, fileInfo, diskShare, listenerContext,
                     servicePath);
             return;
         }
         HandlerMethod onFileHandler = formatMethodsHolder.getContentMethod(ON_FILE);
         if (onFileHandler != null && onFileHandler.matchesFileName(fileName)) {
-            invokeContentHandler(env, context, onFileHandler, filePath, fileInfo, diskShare, listenerConfig,
+            invokeContentHandler(env, context, onFileHandler, filePath, fileInfo, diskShare, listenerContext,
                     servicePath);
         }
     }
@@ -689,7 +696,7 @@ public class SmbListenerHelper {
 
     private static void invokeContentHandler(Environment env, ServiceContext context, HandlerMethod handler,
                                              String filePath, BMap<BString, Object> fileInfo, DiskShare diskShare,
-                                             BMap<BString, Object> listenerConfig, String servicePath) {
+                                             ListenerContext listenerContext, String servicePath) {
         Type contentParamType = handler.contentType();
         if (contentParamType == null) {
             return;
@@ -697,16 +704,18 @@ public class SmbListenerHelper {
         String methodName = handler.name();
         Object content;
         try {
-            content = readFileContent(env, diskShare, filePath, methodName, contentParamType, listenerConfig);
+            content = readFileContent(env, diskShare, filePath, methodName, contentParamType,
+                    listenerContext.config());
         } catch (Exception e) {
-            notifyServiceOnError(env, context, e);
+            notifyServiceOnError(env, context, e, listenerContext);
             return;
         }
 
         if (content == null || content instanceof BError
                 || TypeUtils.getType(content).getTag() == TypeTags.ERROR_TAG) {
             if (content instanceof BError bError) {
-                notifyServiceOnError(env, context, new Exception(bError.getErrorMessage().getValue()));
+                notifyServiceOnError(env, context, new Exception(bError.getErrorMessage().getValue()),
+                        listenerContext);
             }
             return;
         }
@@ -716,7 +725,7 @@ public class SmbListenerHelper {
             switch (parameter) {
                 case FILE_INFO -> args.add(fileInfo);
                 case CALLER -> {
-                    BObject caller = context.getCaller();
+                    BObject caller = listenerContext.caller();
                     if (caller != null) {
                         args.add(caller);
                     }
@@ -741,19 +750,22 @@ public class SmbListenerHelper {
                 handlerError = e;
             }
             if (handlerError != null) {
-                notifyServiceOnError(env, context, handlerError);
+                notifyServiceOnError(env, context, handlerError, listenerContext);
                 if (afterError != null) {
-                    executePostProcessAction(env, context, afterError, filePath, diskShare, servicePath);
+                    executePostProcessAction(env, context, afterError, filePath, diskShare, servicePath,
+                            listenerContext);
                 }
             }
             if (isSuccess && afterProcess != null) {
-                executePostProcessAction(env, context, afterProcess, filePath, diskShare, servicePath);
+                executePostProcessAction(env, context, afterProcess, filePath, diskShare, servicePath,
+                        listenerContext);
             }
         });
     }
 
     private static void executePostProcessAction(Environment env, ServiceContext context, PostProcessAction action,
-                                                  String filePath, DiskShare diskShare, String servicePath) {
+                                                  String filePath, DiskShare diskShare, String servicePath,
+                                                  ListenerContext listenerContext) {
         String normalizedPath = filePath.startsWith(SLASH_SUFFIX) ? filePath.substring(1) : filePath;
         try {
             if (action.isDelete()) {
@@ -762,7 +774,7 @@ public class SmbListenerHelper {
                 executeMoveAction(diskShare, normalizedPath, filePath, action, servicePath);
             }
         } catch (Exception e) {
-            notifyServiceOnError(env, context, e);
+            notifyServiceOnError(env, context, e, listenerContext);
         }
     }
 
@@ -999,24 +1011,26 @@ public class SmbListenerHelper {
         return CsvIterator.createRecordStream(inputStream, constraintType, false);
     }
 
-    private static void notifyServiceOnError(Environment env, ServiceContext context, Exception e) {
+    private static void notifyServiceOnError(Environment env, ServiceContext context, Exception e,
+                                             ListenerContext listenerContext) {
         try {
-            invokeOnErrorHandler(env, context, createOnErrorValue(e));
+            invokeOnErrorHandler(env, context, createOnErrorValue(e), listenerContext);
         } catch (Exception ignored) {
-            log.debug("Service does not implement onError or error invoking onError: {}", ignored.getMessage());
+            log.debug("Error invoking onError: {}", ignored.getMessage());
         }
     }
 
-    private static void notifyServicesOnError(Environment env, List<ServiceContext> services, Exception e) {
+    private static void notifyServicesOnError(Environment env, List<ServiceContext> services, Exception e,
+                                              ListenerContext listenerContext) {
         if (services == null || services.isEmpty()) {
             return;
         }
         BError bError = createOnErrorValue(e);
         for (ServiceContext context : services) {
             try {
-                invokeOnErrorHandler(env, context, bError);
+                invokeOnErrorHandler(env, context, bError, listenerContext);
             } catch (Exception ignored) {
-                log.debug("Service does not implement onError or error invoking onError: {}", ignored.getMessage());
+                log.debug("Error invoking onError: {}", ignored.getMessage());
             }
         }
     }
@@ -1030,14 +1044,19 @@ public class SmbListenerHelper {
     }
 
     /**
-     * Invokes the {@code onError} handler of the given service. The listener's {@code smb:Caller} is appended
-     * when the handler declares the optional second parameter, so that error handling can act on the server.
+     * Invokes the {@code onError} handler of the given service, if it declares one. The listener's
+     * {@code smb:Caller} is appended when the handler declares the optional second parameter, so that error
+     * handling can act on the server.
      */
-    private static void invokeOnErrorHandler(Environment env, ServiceContext context, BError bError) {
+    private static void invokeOnErrorHandler(Environment env, ServiceContext context, BError bError,
+                                             ListenerContext listenerContext) {
         HandlerMethod handler = context.getFormatMethodsHolder().getOnErrorMethod();
+        if (handler == null) {
+            return;
+        }
         List<Object> args = new ArrayList<>();
         args.add(bError);
-        appendCallerIfDeclared(args, handler, context);
+        appendCallerIfDeclared(args, handler, listenerContext);
         Object result = env.getRuntime().callMethod(context.getService(), ON_ERROR_METHOD,
                 new StrandMetadata(handler.isConcurrentSafe(), null), args.toArray());
         if (result instanceof BError resultError) {

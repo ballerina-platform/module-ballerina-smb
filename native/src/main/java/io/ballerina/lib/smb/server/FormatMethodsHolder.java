@@ -82,17 +82,13 @@ public class FormatMethodsHolder {
         this.onFileDeleteMethod = onFileDelete == null
                 ? null
                 : resolveMethod(serviceType, onFileDelete, ON_FILE_DELETE, listenerFileNamePattern);
-        // The runtime does not report every declared onError method, yet the listener can still invoke it. So a
-        // placeholder is kept for the unresolved case rather than treating the handler as absent. Its isolation
-        // cannot be read — ObjectType.isIsolated panics for a method it does not report — so the invocation is
-        // left to run on a non-concurrent strand, and it simply fails if the service declares no onError.
         MethodType onError = getMethod(serviceType, ON_ERROR_METHOD);
         this.onErrorMethod = onError == null
-                ? new HandlerMethod(ON_ERROR_METHOD, null, List.of(), null, null, null, false)
+                ? null
                 : resolveMethod(serviceType, onError, ON_ERROR_METHOD, listenerFileNamePattern);
         this.needsCaller = contentMethods.values().stream().anyMatch(HandlerMethod::declaresCaller)
                 || (onFileDeleteMethod != null && onFileDeleteMethod.declaresCaller())
-                || onErrorMethod.declaresCaller();
+                || (onErrorMethod != null && onErrorMethod.declaresCaller());
     }
 
     private static HandlerMethod resolveMethod(ObjectType serviceType, MethodType method, String methodName,
@@ -179,10 +175,9 @@ public class FormatMethodsHolder {
     }
 
     /**
-     * Gets the {@code onError} handler method. Never null, so that a handler the runtime does not report is
-     * still invoked with the error alone.
+     * Gets the {@code onError} handler method.
      *
-     * @return The resolved handler
+     * @return The resolved handler, or null when the service does not declare it
      */
     public HandlerMethod getOnErrorMethod() {
         return onErrorMethod;
