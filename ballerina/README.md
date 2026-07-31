@@ -25,6 +25,9 @@ import ballerina/smb;
 ### Step 2: Read and write files with a client
 
 ```ballerina
+import ballerina/io;
+import ballerina/smb;
+
 smb:Client smbClient = check new ({
     host: "smb.example.com",
     share: "reports",
@@ -39,8 +42,12 @@ smb:Client smbClient = check new ({
 
 public function main() returns error? {
     check smbClient->putText("/daily/summary.txt", "All systems nominal");
+
     string content = check smbClient->getText("/daily/summary.txt");
+    io:println(content);
+
     smb:FileInfo[] files = check smbClient->list("/daily");
+    io:println(string `${files.length()} entries in /daily`);
 }
 ```
 
@@ -74,9 +81,11 @@ type SalesReport record {|
 }
 service "salesProcessor" on smbListener {
 
-    remote function onFileJson(SalesReport report, smb:FileInfo fileInfo, smb:Caller caller) returns error? {
+    @smb:FunctionConfig {
+        afterProcess: {moveTo: "/sales/processed"}
+    }
+    remote function onFileJson(SalesReport report, smb:FileInfo fileInfo) returns error? {
         log:printInfo(string `Store ${report.storeId} reported ${report.total}`);
-        check caller->move(fileInfo.path, string `/sales/processed/${fileInfo.name}`);
     }
 
     remote function onError(error err) returns error? {
@@ -143,7 +152,7 @@ The client exposes one operation per content type, so no manual parsing is neede
 
 Every `put*` operation takes an optional `smb:OVERWRITE` (default) or `smb:APPEND` write option.
 
-File and directory management is handled by `list`, `mkdir`, `rmdir`, `rename`, `move`, `copy`, `delete`, `exists`, `size`, `isDirectory`, and `close`. Signatures and return types for all of these are in the [`smb:Client` API documentation](https://central.ballerina.io/ballerina/smb/latest#Client).
+The file and directory management operations, and the signatures and return types of everything above, are in the [`smb:Client` API documentation](https://central.ballerina.io/ballerina/smb/latest#Client).
 
 ## SMB listener
 
@@ -152,11 +161,11 @@ The `smb:Listener` polls a directory on a share and invokes a service for each f
 | Field | Description |
 | --- | --- |
 | `pollingInterval` | Seconds between polls. Default is `60`. |
-| `fileNamePattern` | Regular expression the file name must match, for example `(.*).txt`. Applies to every handler unless a handler overrides it. |
+| `fileNamePattern` | Regular expression the file name must match, for example `(.*)\.txt`. Applies to every handler unless a handler overrides it. |
 
 ### The SMB service
 
-A service attached to the listener watches one directory. The directory is taken from the `path` field of `@smb:ServiceConfig`, or from the service name when the annotation is omitted. The listener descends into subdirectories of that path.
+A service attached to the listener watches one directory. The directory is taken from the `path` field of `@smb:ServiceConfig`. The listener descends into subdirectories of that path.
 
 ```ballerina
 @smb:ServiceConfig {
@@ -167,7 +176,7 @@ service "salesProcessor" on smbListener {
 }
 ```
 
-A service must declare at least one `onFile*` or `onFileDelete` method. The compiler plugin rejects any other remote method name, any resource method, and any return type other than `error?` or `smb:Error?`.
+A service must declare at least one `onFile*` or `onFileDelete` method.
 
 ### Content handlers
 
@@ -203,7 +212,7 @@ service "reportProcessor" on smbListener {
 A handler may take up to two more parameters after the content, in either order:
 
 - `smb:FileInfo` — the file's name, path, size, timestamps, and attributes.
-- `smb:Caller` — the share connection. It offers the same operations as `smb:Client`, except that its `get*` operations always return the built-in type (`json`, `xml`, `string[][]`) rather than binding to a target type.
+- `smb:Caller` — the share connection, for reading or writing other files while this one is being processed.
 
 ### Handling deletions
 
@@ -244,7 +253,7 @@ With a `moveTo` destination, `preserveSubDirs` (default `true`) recreates the fi
 service "invoiceProcessor" on smbListener {
 
     @smb:FunctionConfig {
-        fileNamePattern: "invoice_(.*).csv",
+        fileNamePattern: "invoice_(.*)\\.csv",
         afterProcess: {moveTo: "/invoices/processed"},
         afterError: {moveTo: "/invoices/failed", preserveSubDirs: false}
     }

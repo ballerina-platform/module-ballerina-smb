@@ -230,7 +230,10 @@ public isolated client class Client {
     # ```
     #
     # + path - The path to the file on the SMB server
-    # + targetType - The element type each CSV row is bound to, either `string[]` or a record type
+    # + targetType - Expected element type (to be used for automatic data binding).
+    #                Supported types:
+    #                - Built-in types: `string[]` - Array of strings representing CSV columns
+    #                - Custom types: (e.g., `User`, `Student?`, `Person[]`, etc.)
     # + return - A stream from which the file can be read or `smb:Error` in case of errors
     remote isolated function getCsvAsStream(string path, typedesc<string[]|record {}> targetType = <>)
             returns stream<targetType, error?>|Error = @java:Method {

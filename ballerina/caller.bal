@@ -15,7 +15,6 @@
 // under the License.
 
 # Provides access to the SMB share from within a service's remote methods.
-# It offers the same operations as `smb:Client`, except that the `get*` operations do not bind to a target type.
 public isolated client class Caller {
     private final Client 'client;
 
