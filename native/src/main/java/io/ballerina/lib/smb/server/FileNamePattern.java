@@ -23,23 +23,20 @@ import java.util.regex.Pattern;
 /**
  * A {@code fileNamePattern} compiled once, when the service is attached or the listener is initialized.
  *
- * @param pattern the compiled regex, or {@code null} when the configured regex did not compile
+ * @param pattern The compiled regex
  */
 public record FileNamePattern(Pattern pattern) {
 
     /**
-     * Compiles the given regex. A regex that does not compile yields a pattern that matches nothing, which is
-     * how the listener has always treated a malformed {@code fileNamePattern}.
+     * Compiles the given regex. A regex that does not compile is reported to whoever configured it, rather
+     * than degrading into a pattern that silently matches nothing.
      *
      * @param regex The regex to compile
      * @return The compiled pattern
+     * @throws java.util.regex.PatternSyntaxException if the regex is not a valid pattern
      */
     public static FileNamePattern compile(String regex) {
-        try {
-            return new FileNamePattern(Pattern.compile(regex));
-        } catch (Exception e) {
-            return new FileNamePattern(null);
-        }
+        return new FileNamePattern(Pattern.compile(regex));
     }
 
     /**
@@ -49,6 +46,6 @@ public record FileNamePattern(Pattern pattern) {
      * @return true if the whole file name matches
      */
     public boolean matches(String fileName) {
-        return pattern != null && pattern.matcher(fileName).matches();
+        return pattern.matcher(fileName).matches();
     }
 }

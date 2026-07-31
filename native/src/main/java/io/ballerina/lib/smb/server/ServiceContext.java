@@ -21,29 +21,12 @@ package io.ballerina.lib.smb.server;
 import io.ballerina.runtime.api.values.BObject;
 
 /**
- * Encapsulates per-service state required by the SMB listener.
+ * Encapsulates per-service state required by the SMB listener. Listener wide state, including the caller,
+ * lives in {@link ListenerContext} instead.
+ *
+ * @param service The attached service object
+ * @param path The normalized path the service monitors
+ * @param formatMethodsHolder The service handlers, resolved at attach time
  */
-public class ServiceContext {
-
-    private final BObject service;
-    private final String path;
-    private final FormatMethodsHolder formatMethodsHolder;
-
-    public ServiceContext(BObject service, String path, FormatMethodsHolder formatMethodsHolder) {
-        this.service = service;
-        this.path = path;
-        this.formatMethodsHolder = formatMethodsHolder;
-    }
-
-    public BObject getService() {
-        return service;
-    }
-
-    public String getPath() {
-        return path;
-    }
-
-    public FormatMethodsHolder getFormatMethodsHolder() {
-        return formatMethodsHolder;
-    }
+public record ServiceContext(BObject service, String path, FormatMethodsHolder formatMethodsHolder) {
 }

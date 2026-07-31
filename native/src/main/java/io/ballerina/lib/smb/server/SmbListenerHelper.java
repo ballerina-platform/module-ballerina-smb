@@ -303,7 +303,7 @@ public class SmbListenerHelper {
             List<ServiceContext> services =
                 (List<ServiceContext>) listenerEndpoint.getNativeData(LISTENER_SERVICES);
             if (services != null) {
-                services.removeIf(context -> context.getService().equals(smbService));
+                services.removeIf(context -> context.service().equals(smbService));
             }
             return null;
         } catch (Exception e) {
@@ -362,7 +362,7 @@ public class SmbListenerHelper {
         List<ServiceContext> serviceContexts = new ArrayList<>(services);
         Set<String> pathsToMonitor = new HashSet<>();
         for (ServiceContext context : serviceContexts) {
-            pathsToMonitor.add(context.getPath());
+            pathsToMonitor.add(context.path());
         }
         for (String path : pathsToMonitor) {
             checkPathForChanges(env, listenerEndpoint, diskShare, path, serviceContexts, listenerContext);
@@ -570,7 +570,7 @@ public class SmbListenerHelper {
     private static List<ServiceContext> matchingServices(String changedPath, List<ServiceContext> allServices) {
         List<ServiceContext> result = new ArrayList<>();
         for (ServiceContext context : allServices) {
-            if (normalizePath(changedPath).equals(normalizePath(context.getPath()))) {
+            if (normalizePath(changedPath).equals(normalizePath(context.path()))) {
                 result.add(context);
             }
         }
@@ -620,7 +620,7 @@ public class SmbListenerHelper {
             return;
         }
         for (ServiceContext context : servicesToNotify) {
-            HandlerMethod handler = context.getFormatMethodsHolder().getOnFileDeleteMethod();
+            HandlerMethod handler = context.formatMethodsHolder().getOnFileDeleteMethod();
             if (handler == null) {
                 continue;
             }
@@ -643,7 +643,7 @@ public class SmbListenerHelper {
         args.add(StringUtils.fromString(deletedFile));
         appendCallerIfDeclared(args, handler, listenerContext);
         try {
-            Object result = env.getRuntime().callMethod(context.getService(), ON_FILE_DELETE,
+            Object result = env.getRuntime().callMethod(context.service(), ON_FILE_DELETE,
                     new StrandMetadata(handler.isConcurrentSafe(), null), args.toArray());
             if (result instanceof BError bError) {
                 notifyServiceOnError(env, context, new Exception(bError.getErrorMessage().getValue()),
@@ -669,7 +669,7 @@ public class SmbListenerHelper {
                                            String extension, BMap<BString, Object> fileInfo,
                                            DiskShare diskShare, ListenerContext listenerContext,
                                            String servicePath) {
-        FormatMethodsHolder formatMethodsHolder = context.getFormatMethodsHolder();
+        FormatMethodsHolder formatMethodsHolder = context.formatMethodsHolder();
         String fileName = fileInfo.getStringValue(NAME).getValue();
         HandlerMethod handler = formatMethodsHolder.getContentMethod(getHandlerMethodForExtension(extension));
         if (handler != null && handler.matchesFileName(fileName)) {
@@ -739,7 +739,7 @@ public class SmbListenerHelper {
             boolean isSuccess = false;
             Exception handlerError = null;
             try {
-                Object result = env.getRuntime().callMethod(context.getService(), methodName,
+                Object result = env.getRuntime().callMethod(context.service(), methodName,
                         new StrandMetadata(handler.isConcurrentSafe(), null), methodArgs);
                 if (result instanceof BError bError) {
                     handlerError = new Exception(bError.getErrorMessage().getValue());
@@ -1050,14 +1050,16 @@ public class SmbListenerHelper {
      */
     private static void invokeOnErrorHandler(Environment env, ServiceContext context, BError bError,
                                              ListenerContext listenerContext) {
-        HandlerMethod handler = context.getFormatMethodsHolder().getOnErrorMethod();
+        HandlerMethod handler = context.formatMethodsHolder().getOnErrorMethod();
         if (handler == null) {
+            // onError is optional. With no handler to report it to, the error would otherwise be lost.
+            bError.printStackTrace();
             return;
         }
         List<Object> args = new ArrayList<>();
         args.add(bError);
         appendCallerIfDeclared(args, handler, listenerContext);
-        Object result = env.getRuntime().callMethod(context.getService(), ON_ERROR_METHOD,
+        Object result = env.getRuntime().callMethod(context.service(), ON_ERROR_METHOD,
                 new StrandMetadata(handler.isConcurrentSafe(), null), args.toArray());
         if (result instanceof BError resultError) {
             log.debug("onError returned an error: {}", resultError.getErrorMessage().getValue());
