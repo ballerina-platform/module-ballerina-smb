@@ -20,8 +20,8 @@ import ballerina/data.xmldata;
 
 import ballerina/jballerina.java;
 
-# SMB client for connecting to and managing SMB servers.
-# Supports reading files in various formats (text, JSON, XML, CSV, bytes) and writing files with overwrite or append options.
+# Connects to an SMB share to read, write, and manage its files and directories.
+# Reads and writes text, JSON, XML, CSV, and binary content, with streaming support for large files.
 public isolated client class Client {
     private final readonly & ClientConfiguration config;
 
@@ -51,9 +51,8 @@ public isolated client class Client {
         'class: "io.ballerina.lib.smb.client.SmbClient"
     } external;
 
-    # Patches a file by writing byte array content at a specified offset on an SMB share.
-    # This allows writing to an arbitrary position in a file without overwriting
-    # the entire file or appending to the end.
+    # Writes byte array content at a byte offset in a file on an SMB share,
+    # leaving the rest of the file untouched.
     # ```ballerina
     # smb:Error? response = client->patch(path, content, 100);
     # ```
@@ -247,7 +246,7 @@ public isolated client class Client {
     # ```
     #
     # + path - The directory path
-    # + return - An array of FileInfo records or an `smb:Error` if failed to establish the communication with the SMB server
+    # + return - Metadata for each file and directory in the given path, or an `smb:Error` if the operation fails
     remote isolated function list(string path) returns FileInfo[]|Error = @java:Method {
         'class: "io.ballerina.lib.smb.client.SmbClient"
     } external;
@@ -259,7 +258,7 @@ public isolated client class Client {
     # ```
     #
     # + path - The directory path
-    # + return - `()` or else an `smb:Error` if failed to establish the communication with the SMB server
+    # + return - `()` or else an `smb:Error` if the operation fails
     remote isolated function mkdir(string path) returns Error? = @java:Method {
         'class: "io.ballerina.lib.smb.client.SmbClient"
     } external;
@@ -270,7 +269,7 @@ public isolated client class Client {
     # ```
     #
     # + path - The directory path
-    # + return - `()` or else an `smb:Error` if failed to establish the communication with the SMB server
+    # + return - `()` or else an `smb:Error` if the operation fails
     remote isolated function rmdir(string path) returns Error? = @java:Method {
         'class: "io.ballerina.lib.smb.client.SmbClient"
     } external;
@@ -282,7 +281,7 @@ public isolated client class Client {
     #
     # + origin - The source file location
     # + destination - The destination file location
-    # + return - `()` or else an `smb:Error` if failed to establish the communication with the SMB server
+    # + return - `()` or else an `smb:Error` if the operation fails
     remote isolated function rename(string origin, string destination) returns Error? = @java:Method {
         'class: "io.ballerina.lib.smb.client.SmbClient"
     } external;
@@ -294,7 +293,7 @@ public isolated client class Client {
     #
     # + sourcePath - The source file location
     # + destinationPath - The destination file location
-    # + return - `()` or else an `smb:Error` if failed to establish the communication with the SMB server
+    # + return - `()` or else an `smb:Error` if the operation fails
     remote isolated function move(string sourcePath, string destinationPath) returns Error? = @java:Method {
         'class: "io.ballerina.lib.smb.client.SmbClient"
     } external;
@@ -306,7 +305,7 @@ public isolated client class Client {
     #
     # + sourcePath - The source file location
     # + destinationPath - The destination file location
-    # + return - `()` or else an `smb:Error` if failed to establish the communication with the SMB server
+    # + return - `()` or else an `smb:Error` if the operation fails
     remote isolated function copy(string sourcePath, string destinationPath) returns Error? = @java:Method {
         'class: "io.ballerina.lib.smb.client.SmbClient"
     } external;
@@ -317,7 +316,7 @@ public isolated client class Client {
     # ```
     #
     # + path - The resource path
-    # + return - `true` if the file or directory exists, `false` otherwise, or an `smb:Error` if failed to establish the communication with the SMB server
+    # + return - `true` if the file or directory exists, `false` otherwise, or an `smb:Error` if the operation fails
     remote isolated function exists(string path) returns boolean|Error = @java:Method {
         'class: "io.ballerina.lib.smb.client.SmbClient"
     } external;
@@ -328,7 +327,7 @@ public isolated client class Client {
     # ```
     #
     # + path - The resource path
-    # + return - The file size in bytes or an `smb:Error` if failed to establish the communication with the SMB server
+    # + return - The file size in bytes or an `smb:Error` if the operation fails
     remote isolated function size(string path) returns int|Error = @java:Method {
         'class: "io.ballerina.lib.smb.client.SmbClient"
     } external;
@@ -350,7 +349,7 @@ public isolated client class Client {
     # ```
     #
     # + path - The resource path
-    # + return - `()` or else an `smb:Error` if failed to establish the communication with the SMB server
+    # + return - `()` or else an `smb:Error` if the operation fails
     remote isolated function delete(string path) returns Error? = @java:Method {
         'class: "io.ballerina.lib.smb.client.SmbClient"
     } external;
@@ -360,7 +359,7 @@ public isolated client class Client {
     # smb:Error? response = client->close();
     # ```
     #
-    # + return - `()` or else an `smb:Error` if failed to close the connection
+    # + return - `()` or else an `smb:Error` if the connection cannot be closed
     remote isolated function close() returns Error? = @java:Method {
         'class: "io.ballerina.lib.smb.client.SmbClient"
     } external;
