@@ -1013,8 +1013,13 @@ public class SmbListenerHelper {
 
     private static void notifyServiceOnError(Environment env, ServiceContext context, Exception e,
                                              ListenerContext listenerContext) {
+        BError bError = createOnErrorValue(e);
         try {
-            invokeOnErrorHandler(env, context, createOnErrorValue(e), listenerContext);
+            if (!invokeOnErrorHandler(env, context, bError, listenerContext)) {
+                // A data binding or handler failure for one file, with no onError to report it to. The stack
+                // trace is what tells the developer which conversion or handler gave way.
+                bError.printStackTrace();
+            }
         } catch (Exception ignored) {
             log.debug("Error invoking onError: {}", ignored.getMessage());
         }
@@ -1028,7 +1033,12 @@ public class SmbListenerHelper {
         BError bError = createOnErrorValue(e);
         for (ServiceContext context : services) {
             try {
-                invokeOnErrorHandler(env, context, bError, listenerContext);
+                if (!invokeOnErrorHandler(env, context, bError, listenerContext)) {
+                    // Polling repeats for the life of the listener, so an unreported failure is logged rather
+                    // than dumped to stderr — otherwise one bad path floods it once per interval, forever.
+                    log.error("Polling failed and the service declares no onError method: {}",
+                            bError.getErrorMessage().getValue());
+                }
             } catch (Exception ignored) {
                 log.debug("Error invoking onError: {}", ignored.getMessage());
             }
@@ -1044,17 +1054,16 @@ public class SmbListenerHelper {
     }
 
     /**
-     * Invokes the {@code onError} handler of the given service, if it declares one. The listener's
-     * {@code smb:Caller} is appended when the handler declares the optional second parameter, so that error
-     * handling can act on the server.
+     * Invokes the {@code onError} handler of the given service. The listener's {@code smb:Caller} is appended
+     * when the handler declares the optional second parameter, so that error handling can act on the server.
+     *
+     * @return false when the service declares no {@code onError}, leaving the caller to report the error
      */
-    private static void invokeOnErrorHandler(Environment env, ServiceContext context, BError bError,
-                                             ListenerContext listenerContext) {
+    private static boolean invokeOnErrorHandler(Environment env, ServiceContext context, BError bError,
+                                                ListenerContext listenerContext) {
         HandlerMethod handler = context.formatMethodsHolder().getOnErrorMethod();
         if (handler == null) {
-            // onError is optional. With no handler to report it to, the error would otherwise be lost.
-            bError.printStackTrace();
-            return;
+            return false;
         }
         List<Object> args = new ArrayList<>();
         args.add(bError);
@@ -1064,6 +1073,7 @@ public class SmbListenerHelper {
         if (result instanceof BError resultError) {
             log.debug("onError returned an error: {}", resultError.getErrorMessage().getValue());
         }
+        return true;
     }
 
     private static AuthenticationContext createKerberosAuthContext(BMap<?, ?> kerberosConfig,
