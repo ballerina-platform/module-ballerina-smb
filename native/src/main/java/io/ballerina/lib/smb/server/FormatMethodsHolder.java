@@ -36,22 +36,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static io.ballerina.lib.smb.server.SmbListenerHelper.AFTER_ERROR;
-import static io.ballerina.lib.smb.server.SmbListenerHelper.AFTER_PROCESS;
-import static io.ballerina.lib.smb.server.SmbListenerHelper.CALLER;
-import static io.ballerina.lib.smb.server.SmbListenerHelper.COLON;
-import static io.ballerina.lib.smb.server.SmbListenerHelper.FILE_INFO;
-import static io.ballerina.lib.smb.server.SmbListenerHelper.FILE_NAME_PATTERN;
-import static io.ballerina.lib.smb.server.SmbListenerHelper.FUNCTION_CONFIG;
-import static io.ballerina.lib.smb.server.SmbListenerHelper.MOVE_TO;
-import static io.ballerina.lib.smb.server.SmbListenerHelper.ON_ERROR_METHOD;
-import static io.ballerina.lib.smb.server.SmbListenerHelper.ON_FILE;
-import static io.ballerina.lib.smb.server.SmbListenerHelper.ON_FILE_CSV;
-import static io.ballerina.lib.smb.server.SmbListenerHelper.ON_FILE_DELETE;
-import static io.ballerina.lib.smb.server.SmbListenerHelper.ON_FILE_JSON;
-import static io.ballerina.lib.smb.server.SmbListenerHelper.ON_FILE_TEXT;
-import static io.ballerina.lib.smb.server.SmbListenerHelper.ON_FILE_XML;
-import static io.ballerina.lib.smb.server.SmbListenerHelper.PRESERVE_SUB_DIRS;
+import static io.ballerina.lib.smb.server.ListenerConstants.AFTER_ERROR;
+import static io.ballerina.lib.smb.server.ListenerConstants.AFTER_PROCESS;
+import static io.ballerina.lib.smb.server.ListenerConstants.CALLER;
+import static io.ballerina.lib.smb.server.ListenerConstants.COLON;
+import static io.ballerina.lib.smb.server.ListenerConstants.FILE_INFO;
+import static io.ballerina.lib.smb.server.ListenerConstants.FILE_NAME_PATTERN;
+import static io.ballerina.lib.smb.server.ListenerConstants.FUNCTION_CONFIG;
+import static io.ballerina.lib.smb.server.ListenerConstants.MOVE_TO;
+import static io.ballerina.lib.smb.server.ListenerConstants.ON_ERROR_METHOD;
+import static io.ballerina.lib.smb.server.ListenerConstants.ON_FILE;
+import static io.ballerina.lib.smb.server.ListenerConstants.ON_FILE_CSV;
+import static io.ballerina.lib.smb.server.ListenerConstants.ON_FILE_DELETE;
+import static io.ballerina.lib.smb.server.ListenerConstants.ON_FILE_JSON;
+import static io.ballerina.lib.smb.server.ListenerConstants.ON_FILE_TEXT;
+import static io.ballerina.lib.smb.server.ListenerConstants.ON_FILE_XML;
+import static io.ballerina.lib.smb.server.ListenerConstants.PRESERVE_SUB_DIRS;
 
 /**
  * Resolves the handler methods of an SMB service once, when the service is attached to the listener.
