@@ -199,7 +199,7 @@ When a file appears, the listener picks the handler that matches its extension, 
 | `onFileCsv` | `.csv` | `string[][]`, a record array, `stream<string[], error?>`, a stream of records |
 | `onFile` | Everything else, and the fallback for the above | `byte[]`, `stream<byte[], error?>` |
 
-Declaring a `stream` parameter reads the file in chunks instead of loading it into memory, which is the right choice for large files. Close the stream when the handler is done with it.
+Declaring a `stream` parameter reads the file in chunks instead of loading it into memory, which is the right choice for large files. A query expression consumes the stream to completion; call `close()` yourself only if you stop reading early.
 
 ```ballerina
 service "reportProcessor" on smbListener {
@@ -209,11 +209,12 @@ service "reportProcessor" on smbListener {
     }
 
     remote function onFile(stream<byte[], error?> content, smb:FileInfo fileInfo) returns error? {
-        record {|byte[] value;|}? chunk = check content.next();
-        while chunk is record {|byte[] value;|} {
-            chunk = check content.next();
-        }
-        check content.close();
+        int total = 0;
+        check from byte[] chunk in content
+            do {
+                total += chunk.length();
+            };
+        log:printInfo(string `${fileInfo.name} is ${total} bytes`);
     }
 }
 ```
