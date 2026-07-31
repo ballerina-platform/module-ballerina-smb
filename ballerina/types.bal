@@ -101,16 +101,6 @@ public type FileInfo record {|
     string uri;
 |};
 
-# File system changes detected by the SMB listener in a polling cycle.
-#
-# + addedFiles - Array of newly added files
-# + deletedFiles - Array of deleted file names
-public type WatchEvent record {|
-    FileInfo[] addedFiles;
-    string[] deletedFiles;
-|};
-
-
 # Configuration for the SMB listener.
 #
 # + host - Target SMB server hostname or IP address

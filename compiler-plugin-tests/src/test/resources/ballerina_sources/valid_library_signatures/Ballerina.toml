@@ -1,0 +1,4 @@
+[package]
+org = "smb_test"
+name = "valid_library_signatures"
+version = "0.1.0"
