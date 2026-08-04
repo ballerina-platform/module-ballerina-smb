@@ -612,11 +612,12 @@ public class SmbClient {
         SMB2CreateDisposition disposition = append ?
                 SMB2CreateDisposition.FILE_OPEN_IF : SMB2CreateDisposition.FILE_OVERWRITE_IF;
 
-        File file = share.openFile(filePath, accessMask, fileAttributes, SMB2ShareAccess.ALL,
+        try (File file = share.openFile(filePath, accessMask, fileAttributes, SMB2ShareAccess.ALL,
                 disposition, EnumSet.noneOf(SMB2CreateOptions.class));
-        OutputStream outputStream = file.getOutputStream(append);
-        outputStream.write(bytes);
-        outputStream.flush();
+             OutputStream outputStream = file.getOutputStream(append)) {
+            outputStream.write(bytes);
+            outputStream.flush();
+        }
     }
 
     private static void writeFileFromStream(BObject clientEndpoint, String filePath,
@@ -631,15 +632,16 @@ public class SmbClient {
         SMB2CreateDisposition disposition = append ?
                 SMB2CreateDisposition.FILE_OPEN_IF : SMB2CreateDisposition.FILE_OVERWRITE_IF;
 
-        File file = share.openFile(filePath, accessMask, fileAttributes, SMB2ShareAccess.ALL,
+        try (File file = share.openFile(filePath, accessMask, fileAttributes, SMB2ShareAccess.ALL,
                 disposition, EnumSet.noneOf(SMB2CreateOptions.class));
-        OutputStream outputStream = file.getOutputStream(append);
-        byte[] buffer = new byte[ARRAY_SIZE];
-        int bytesRead;
-        while ((bytesRead = inputStream.read(buffer)) != -1) {
-            outputStream.write(buffer, 0, bytesRead);
+             OutputStream outputStream = file.getOutputStream(append)) {
+            byte[] buffer = new byte[ARRAY_SIZE];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+            }
+            outputStream.flush();
         }
-        outputStream.flush();
     }
 
     private static Session authenticateSession(Connection connection, BObject clientEndpoint) throws IOException {
