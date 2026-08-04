@@ -29,7 +29,9 @@ def packageName = "smb"
 def packageOrg = "ballerina"
 def tomlVersion = stripBallerinaExtensionVersion("${project.version}")
 def ballerinaTomlFilePlaceHolder = new File("${project.rootDir}/build-config/resources/Ballerina.toml")
+def compilerPluginTomlFilePlaceHolder = new File("${project.rootDir}/build-config/resources/CompilerPlugin.toml")
 def ballerinaTomlFile = new File("$project.projectDir/Ballerina.toml")
+def ballerinaCompilerPluginFile = new File("$project.projectDir/CompilerPlugin.toml")
 def stripBallerinaExtensionVersion(String extVersion) {
     if (extVersion.matches(project.ext.timestampedVersionRegex)) {
         def splitVersion = extVersion.split('-')
@@ -119,6 +121,9 @@ task updateTomlFiles {
         newConfig = newConfig.replace("@asn.one.version@", asnOneVersion)
 
         ballerinaTomlFile.text = newConfig
+
+        def newPluginConfig = compilerPluginTomlFilePlaceHolder.text.replace("@project.version@", project.version)
+        ballerinaCompilerPluginFile.text = newPluginConfig
     }
 }
 
@@ -127,9 +132,9 @@ task commitTomlFiles {
         project.exec {
             ignoreExitValue true
             if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-                commandLine 'cmd', '/c', "git commit -m \"[Automated] Update the native jar versions\" Ballerina.toml Dependencies.toml"
+                commandLine 'cmd', '/c', "git commit -m \"[Automated] Update the native jar versions\" Ballerina.toml Dependencies.toml CompilerPlugin.toml"
             } else {
-                commandLine 'sh', '-c', "git commit -m '[Automated] Update the native jar versions' Ballerina.toml Dependencies.toml"
+                commandLine 'sh', '-c', "git commit -m '[Automated] Update the native jar versions' Ballerina.toml Dependencies.toml CompilerPlugin.toml"
             }
         }
     }
@@ -193,7 +198,9 @@ updateTomlFiles.dependsOn copyStdlibs
 
 build.dependsOn "generatePomFileForMavenPublication"
 build.dependsOn ":${packageName}-native:build"
+build.dependsOn ":${packageName}-compiler-plugin:build"
 test.dependsOn ":${packageName}-native:build"
+test.dependsOn ":${packageName}-compiler-plugin:build"
 test.dependsOn startSmbDockerServer
 test.finalizedBy stopSmbDockerServer
 test.onlyIf {

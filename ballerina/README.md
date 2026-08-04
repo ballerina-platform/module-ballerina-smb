@@ -1,510 +1,287 @@
 ## Overview
 
-This module provides an SMB client and an SMB server listener implementation to facilitate connections to remote SMB (Server Message Block) file shares. SMB is a network file sharing protocol that allows applications to read and write to files and request services from server programs in a computer network.
+This module provides an SMB client and an SMB listener for working with files on remote SMB (Server Message Block) file shares — the protocol behind Windows file servers, NAS appliances, and Samba.
 
-The module supports SMB protocol versions `2.0.2` through `3.1.1`, with features including NTLMv2 authentication, Kerberos authentication, message signing, and data encryption.
+The module supports SMB dialects `2.0.2` through `3.1.1`, NTLMv2 and Kerberos authentication, message signing, and data encryption.
 
-### SMB client
+| Component | Purpose |
+| --- | --- |
+| `smb:Client` | Connect to a share and read, write, move, copy, and list files. |
+| `smb:Listener` | Poll a directory on a share and dispatch each added or deleted file to a service. |
+| `smb:Caller` | The share connection made available to a service, so a handler can act on the share while processing a file. |
 
-The `smb:Client` connects to an SMB server and performs various operations on files and directories. It supports the following operations: `get`, `delete`, `put`, `patch`, `mkdir`, `rmdir`, `isDirectory`, `rename`, `move`, `copy`, `size`, `exists`, and `list`. The client also provides typed data operations for reading and writing files as text, JSON, XML, CSV, and binary data, with streaming support for handling large files efficiently.
+All paths are relative to the configured share.
 
-An SMB client is defined using the `host` and `share` parameters and optionally, the `port` and `auth`. Authentication configuration can be configured using the `auth` parameter for NTLM credentials or Kerberos authentication.
+## Quickstart
 
-#### Create a client
+To use the `smb` module in your Ballerina application, follow the steps below.
 
-The following code creates an SMB client and performs I/O operations, connecting to the SMB server with NTLM authentication.
+### Step 1: Import the module
 
 ```ballerina
-smb:ClientConfiguration smbConfig = {
-    host: "<The SMB host>",
-    port: <The SMB port>,
-    share: "<The SMB share name>",
-    auth: {
-        credentials: {
-            username: "<The SMB username>",
-            password: "<The SMB password>",
-            domain: "<The SMB domain>"
-        }
-    }
-};
-
-// Create the SMB client.
-smb:Client|smb:Error smbClient = new(smbConfig);
+import ballerina/smb;
 ```
 
-##### Create a client with Kerberos authentication
-
-The following code creates an SMB client using Kerberos authentication.
+### Step 2: Read and write files with a client
 
 ```ballerina
-smb:ClientConfiguration smbConfig = {
-    host: "<The SMB host>",
-    share: "<The SMB share name>",
+import ballerina/io;
+import ballerina/smb;
+
+smb:Client smbClient = check new ({
+    host: "smb.example.com",
+    share: "reports",
+    auth: {
+        credentials: {
+            username: "alice",
+            password: "***",
+            domain: "WORKGROUP"
+        }
+    }
+});
+
+public function main() returns error? {
+    check smbClient->putText("/daily/summary.txt", "All systems nominal");
+
+    string content = check smbClient->getText("/daily/summary.txt");
+    io:println(content);
+
+    smb:FileInfo[] files = check smbClient->list("/daily");
+    io:println(string `${files.length()} entries in /daily`);
+}
+```
+
+### Step 3: Handle incoming files with a listener
+
+The listener polls a directory and calls a handler for every file it finds. The handler that runs, and the type the content is bound to, depend on the file extension.
+
+```ballerina
+import ballerina/log;
+import ballerina/smb;
+
+listener smb:Listener smbListener = check new ({
+    host: "smb.example.com",
+    share: "reports",
+    pollingInterval: 10,
+    auth: {
+        credentials: {
+            username: "alice",
+            password: "***"
+        }
+    }
+});
+
+type SalesReport record {|
+    string storeId;
+    decimal total;
+|};
+
+@smb:ServiceConfig {
+    path: "/sales/new"
+}
+service "salesProcessor" on smbListener {
+
+    @smb:FunctionConfig {
+        afterProcess: {moveTo: "/sales/processed"}
+    }
+    remote function onFileJson(SalesReport report, smb:FileInfo fileInfo) returns error? {
+        log:printInfo(string `Store ${report.storeId} reported ${report.total}`);
+    }
+
+    remote function onError(error err) returns error? {
+        log:printError("Failed to process the file", err);
+    }
+}
+```
+
+### Step 4: Run the service
+
+```bash
+bal run
+```
+
+## SMB client
+
+An `smb:Client` is created with an `smb:ClientConfiguration` record. `host` and `share` identify the target; everything else has a default.
+
+```ballerina
+smb:Client smbClient = check new ({
+    host: "smb.example.com",
+    port: 445,
+    share: "reports",
+    auth: {
+        credentials: {username: "alice", password: "***", domain: "WORKGROUP"}
+    },
+    dialects: [smb:SMB_3_1_1, smb:SMB_3_0_2],
+    signRequired: true,
+    encryptData: true,
+    enableDfs: false,
+    bufferSize: 65536,
+    connectTimeout: 30.0
+});
+```
+
+To authenticate with Kerberos, provide `kerberosConfig` instead of `credentials`:
+
+```ballerina
+smb:Client smbClient = check new ({
+    host: "smb.example.com",
+    share: "reports",
     auth: {
         kerberosConfig: {
-            principal: "user@REALM.COM",
-            realm: "REALM.COM",
-            keytab: "/path/to/user.keytab",
-            configFile: "/path/to/krb5.conf"
-        }
-    }
-};
-
-smb:Client smbClient = check new(smbConfig);
-```
-
-##### Create a directory
-
-The following code creates a directory in the remote SMB share.
-
-```ballerina
-smb:Error? mkdirResponse = smbClient->mkdir("<The directory path>");
-```
-
-##### Upload a file to a remote server
-
-The following code uploads a file to a remote SMB share.
-
-```ballerina
-byte[] fileContent = check io:fileReadBytes(putFilePath);
-smb:Error? putResponse = smbClient->put("<The resource path>", fileContent);
-```
-
-You can also upload files as specific types:
-
-**Upload as text:**
-
-```ballerina
-smb:Error? result = smbClient->putText("<The file path>", "Hello, World!");
-```
-
-**Upload as JSON or record:**
-
-```ballerina
-json jsonData = {name: "John", age: 30};
-smb:Error? result = smbClient->putJson("<The file path>", jsonData);
-
-type User record {
-    string name;
-    int age;
-};
-
-User user = {name: "Jane", age: 25};
-smb:Error? result = smbClient->putJson("<The file path>", user);
-```
-
-**Upload as XML:**
-
-```ballerina
-xml xmlData = xml `<config><database>mydb</database></config>`;
-smb:Error? result = smbClient->putXml("<The file path>", xmlData);
-```
-
-**Upload as CSV (string arrays or typed records):**
-
-```ballerina
-string[][] csvData = [["Name", "Age"], ["John", "30"], ["Jane", "25"]];
-smb:Error? result = smbClient->putCsv("<The file path>", csvData);
-
-type Person record {
-    string name;
-    int age;
-};
-
-Person[] people = [{name: "John", age: 30}, {name: "Jane", age: 25}];
-smb:Error? result = smbClient->putCsv("<The file path>", people);
-```
-
-**Upload as bytes:**
-
-```ballerina
-byte[] binaryData = [0x48, 0x65, 0x6C, 0x6C, 0x6F]; // "Hello"
-smb:Error? result = smbClient->putBytes("<The file path>", binaryData);
-```
-
-##### Write at a specific offset
-
-The following code writes content at a specific offset in a file without overwriting the entire file.
-
-```ballerina
-byte[] patchContent = "patched content".toBytes();
-smb:Error? patchResponse = smbClient->patch("<The file path>", patchContent, <offset>);
-```
-
-##### Get the size of a remote file
-
-The following code gets the size of a file in a remote SMB share.
-
-```ballerina
-int|smb:Error sizeResponse = smbClient->size("<The resource path>");
-```
-
-##### Check if a file exists
-
-The following code checks if a file or directory exists in the remote SMB share.
-
-```ballerina
-boolean|smb:Error existsResponse = smbClient->exists("<The resource path>");
-```
-
-##### Read the content of a remote file
-
-The following code reads the content of a file in a remote SMB share. The SMB client supports various data types including text, JSON, XML, CSV, and binary data through typed get operations.
-
-```ballerina
-string fileContent = check smbClient->getText("<The file path>");
-```
-
-**Read as JSON or typed record:**
-
-```ballerina
-// Read as JSON
-json jsonData = check smbClient->getJson("<The file path>");
-
-// Read as a specific record type
-type User record {
-    string name;
-    int age;
-};
-
-User userData = check smbClient->getJson("<The file path>");
-```
-
-**Read as XML or typed record:**
-
-```ballerina
-xml xmlData = check smbClient->getXml("<The file path>");
-
-type Config record {
-    string database;
-    int timeout;
-};
-
-Config config = check smbClient->getXml("<The file path>");
-```
-
-**Read as CSV (string arrays or typed records):**
-
-```ballerina
-string[][] csvData = check smbClient->getCsv("<The file path>");
-
-type CsvRecord record {
-    string id;
-    string name;
-    string email;
-};
-
-CsvRecord[] records = check smbClient->getCsv("<The file path>");
-```
-
-**Read as bytes:**
-
-```ballerina
-byte[] fileBytes = check smbClient->getBytes("<The file path>");
-
-stream<byte[], error?> byteStream = check smbClient->getBytesAsStream("<The file path>");
-record {|byte[] value;|}? nextBytes = check byteStream.next();
-check byteStream.close();
-```
-
-##### Rename/move a remote file
-
-The following code renames or moves a file to another location in the same remote SMB share.
-
-```ballerina
-smb:Error? renameResponse = smbClient->rename("<The source file path>",
-    "<The destination file path>");
-```
-
-##### Copy a remote file
-
-The following code copies a file to another location in the same remote SMB share.
-
-```ballerina
-smb:Error? copyResponse = smbClient->copy("<The source file path>",
-    "<The destination file path>");
-```
-
-##### Delete a remote file
-
-The following code deletes a remote file in a remote SMB share.
-
-```ballerina
-smb:Error? deleteResponse = smbClient->delete("<The resource path>");
-```
-
-##### Remove a directory from a remote server
-
-The following code removes a directory in a remote SMB share.
-
-```ballerina
-smb:Error? rmdirResponse = smbClient->rmdir("<The directory path>");
-```
-
-##### List files in a directory
-
-The following code lists files and directories in a remote SMB share.
-
-```ballerina
-smb:FileInfo[]|smb:Error listResponse = smbClient->list("<The directory path>");
-```
-
-### SMB listener
-
-The `smb:Listener` is used to listen to a remote SMB share location and trigger events when new files are added to or deleted from the directory. The listener supports format-specific content handlers (`onFileText`, `onFileJson`, `onFileXml`, `onFileCsv`, `onFile`) that automatically deserialize file content based on the file type, and an `onFileDelete` handler for deletion events.
-
-An SMB listener is defined using the mandatory `host`, `share`, and `path` parameters. The authentication configuration can be done using the `auth` parameter and the polling interval can be configured using the `pollingInterval` parameter. The default polling interval is 60 seconds.
-
-The `fileNamePattern` parameter can be used to define the type of files the SMB listener will listen to. For instance, if the listener gets invoked for text files, the value `(.*).txt` can be given for the config.
-
-#### Create a listener
-
-The SMB Listener can be used to listen to a remote directory. It will keep listening to the specified directory and notify on file addition and deletion periodically.
-
-```ballerina
-listener smb:Listener remoteServer = check new({
-    host: "<The SMB host>",
-    port: <The SMB port>,
-    share: "<The SMB share name>",
-    path: "<The remote SMB directory location>",
-    pollingInterval: <Polling interval>,
-    auth: {
-        credentials: {
-            username: "<The SMB username>",
-            password: "<The SMB password>",
-            domain: "<The SMB domain>"
+            principal: "alice@EXAMPLE.COM",
+            keytab: "/path/to/alice.keytab",
+            configFile: "/etc/krb5.conf"
         }
     }
 });
 ```
 
-The SMB listener supports content handler methods that automatically deserialize file content based on the file type. The listener supports text, JSON, XML, CSV, and binary data types with automatic extension-based routing.
+The client exposes one operation per content type, so no manual parsing is needed:
 
-**Handle text files:**
+| Operation | Reads/writes |
+| --- | --- |
+| `getText` / `putText` | `string` |
+| `getJson` / `putJson` | `json` or a record type |
+| `getXml` / `putXml` | `xml` or a record type |
+| `getCsv` / `putCsv` | `string[][]` or a record array |
+| `getBytes` / `putBytes` | `byte[]` |
+| `getBytesAsStream` | `stream<byte[], error?>` — for files too large to hold in memory |
+| `getCsvAsStream` | `stream<string[], error?>` or a stream of records |
+| `patch` | `byte[]` written at a byte offset, without rewriting the whole file |
+
+Every `put*` operation takes an optional `smb:OVERWRITE` (default) or `smb:APPEND` write option.
+
+The file and directory management operations, and the signatures and return types of everything above, are in the [`smb:Client` API documentation](https://central.ballerina.io/ballerina/smb/latest#Client).
+
+## SMB listener
+
+The `smb:Listener` polls a directory on a share and invokes a service for each file that appears or disappears. It is configured with an `smb:ListenerConfiguration`, which takes the same connection fields as the client plus:
+
+| Field | Description |
+| --- | --- |
+| `pollingInterval` | Seconds between polls. Default is `60`. |
+| `fileNamePattern` | Regular expression the file name must match, for example `(.*)\.txt`. Applies to every handler unless a handler overrides it. |
+
+### The SMB service
+
+A service attached to the listener watches one directory. The directory is taken from the `path` field of `@smb:ServiceConfig`. The listener descends into subdirectories of that path.
 
 ```ballerina
-service on remoteServer {
+@smb:ServiceConfig {
+    path: "/sales/new"
+}
+service "salesProcessor" on smbListener {
+    // remote methods
+}
+```
+
+A service must declare at least one `onFile*` or `onFileDelete` method.
+
+### Content handlers
+
+When a file appears, the listener picks the handler that matches its extension, reads the file, and binds the content to the type of the first parameter. If that handler is not declared — or its `fileNamePattern` does not match — the file falls through to `onFile`.
+
+| Handler | File extensions | Accepted content types |
+| --- | --- | --- |
+| `onFileText` | `.txt`, `.log`, `.md` | `string` |
+| `onFileJson` | `.json` | `json`, a record type |
+| `onFileXml` | `.xml` | `xml`, a record type |
+| `onFileCsv` | `.csv` | `string[][]`, a record array, `stream<string[], error?>`, a stream of records |
+| `onFile` | Everything else, and the fallback for the above | `byte[]`, `stream<byte[], error?>` |
+
+Declaring a `stream` parameter reads the file in chunks instead of loading it into memory, which is the right choice for large files. A query expression consumes the stream to completion; call `close()` yourself only if you stop reading early.
+
+```ballerina
+service "reportProcessor" on smbListener {
+
     remote function onFileText(string content, smb:FileInfo fileInfo) returns error? {
-        log:printInfo("Text file: " + fileInfo.path);
-        log:printInfo("Content: " + content);
+        log:printInfo(string `${fileInfo.name} has ${content.length()} characters`);
     }
-}
-```
 
-**Handle JSON files (as generic JSON or typed record):**
-
-```ballerina
-type User record {
-    string name;
-    int age;
-    string email;
-};
-
-service on remoteServer {
-    remote function onFileJson(User content, smb:FileInfo fileInfo) returns error? {
-        log:printInfo("User file: " + fileInfo.path);
-        log:printInfo("User name: " + content.name);
-    }
-}
-```
-
-**Handle XML files (as generic XML or typed record):**
-
-```ballerina
-type Config record {
-    string database;
-    int timeout;
-    boolean debug;
-};
-
-service on remoteServer {
-    remote function onFileXml(Config content, smb:FileInfo fileInfo) returns error? {
-        log:printInfo("Config file: " + fileInfo.path);
-        log:printInfo("Database: " + content.database);
-    }
-}
-```
-
-**Handle CSV files (as string arrays or typed record arrays):**
-
-```ballerina
-type CsvRecord record {
-    string id;
-    string name;
-    string email;
-};
-
-service on remoteServer {
-    remote function onFileCsv(CsvRecord[] content, smb:FileInfo fileInfo) returns error? {
-        log:printInfo("CSV file: " + fileInfo.path);
-        foreach CsvRecord rec in content {
-            log:printInfo("Record: " + rec.id + ", " + rec.name);
-        }
-    }
-}
-```
-
-**Handle binary files:**
-
-```ballerina
-service on remoteServer {
-    remote function onFile(byte[] content, smb:FileInfo fileInfo) returns error? {
-        log:printInfo("Binary file: " + fileInfo.path);
-        log:printInfo("File size: " + content.length().toString());
-    }
-}
-```
-
-**Stream large files:**
-
-```ballerina
-service on remoteServer {
     remote function onFile(stream<byte[], error?> content, smb:FileInfo fileInfo) returns error? {
-        log:printInfo("Streaming file: " + fileInfo.path);
-        record {|byte[] value;|}? nextBytes = check content.next();
-        while nextBytes is record {|byte[] value;|} {
-            log:printInfo("Received chunk: " + nextBytes.value.length().toString() + " bytes");
-            nextBytes = check content.next();
-        }
-        check content.close();
+        int total = 0;
+        check from byte[] chunk in content
+            do {
+                total += chunk.length();
+            };
+        log:printInfo(string `${fileInfo.name} is ${total} bytes`);
     }
 }
 ```
 
-**Stream CSV data as typed records:**
+A handler may take up to two more parameters after the content, in either order:
+
+- `smb:FileInfo` — the file's name, path, size, timestamps, and attributes.
+- `smb:Caller` — the share connection, for reading or writing other files while this one is being processed.
+
+### Handling deletions
+
+`onFileDelete` is invoked when a file disappears from the watched directory. It receives the path as a `string`; there is no content or `smb:FileInfo`, because the file is already gone. An optional `smb:Caller` may follow.
 
 ```ballerina
-type DataRow record {
-    string timestamp;
-    string value;
-};
+service "auditService" on smbListener {
 
-service on remoteServer {
-    remote function onFileCsv(stream<DataRow, error?> content, smb:FileInfo fileInfo) returns error? {
-        log:printInfo("Streaming CSV file: " + fileInfo.path);
-        record {|DataRow value;|}|error? nextRow = content.next();
-        while nextRow is record {|DataRow value;|} {
-            log:printInfo("Row: " + nextRow.value.timestamp + " = " + nextRow.value.value);
-            nextRow = content.next();
-        }
-        check content.close();
+    remote function onFileDelete(string path, smb:Caller caller) returns error? {
+        check caller->putText("/audit/deletions.log", path + "\n", smb:APPEND);
     }
 }
 ```
 
-**Handle deleted files:**
+### Handling errors
 
-The `onFileDelete` handler is invoked when a file is removed from the watched directory. It receives the path of the deleted file as a `string`. Since the file no longer exists at the time the handler is called, no file content or `smb:FileInfo` is provided.
+`onError` is invoked when the listener fails to poll, read, or bind a file, and when a handler returns an error. It takes an `error` or `smb:Error`, optionally followed by an `smb:Caller`. Declaring it is optional; without it, failures are logged and processing continues.
 
 ```ballerina
-service on remoteServer {
-    remote function onFileDelete(string deletedFile) returns error? {
-        log:printInfo("File deleted: " + deletedFile);
+remote function onError(smb:Error err, smb:Caller caller) returns error? {
+    log:printError("SMB listener failure", err);
+}
+```
+
+### Filtering and post-processing
+
+`@smb:FunctionConfig` configures an individual handler.
+
+| Field | Description |
+| --- | --- |
+| `fileNamePattern` | Regular expression for the file names this handler accepts. Overrides the listener's `fileNamePattern`. |
+| `afterProcess` | What to do once the handler returns successfully: `smb:DELETE`, or a `moveTo` destination. |
+| `afterError` | What to do when the handler fails: `smb:DELETE`, or a `moveTo` destination. |
+
+With a `moveTo` destination, `preserveSubDirs` (default `true`) recreates the file's subdirectory structure, relative to the service path, under the destination.
+
+```ballerina
+service "invoiceProcessor" on smbListener {
+
+    @smb:FunctionConfig {
+        fileNamePattern: "invoice_(.*)\\.csv",
+        afterProcess: {moveTo: "/invoices/processed"},
+        afterError: {moveTo: "/invoices/failed", preserveSubDirs: false}
+    }
+    remote function onFileCsv(Invoice[] invoices, smb:FileInfo fileInfo) returns error? {
+        // ...
     }
 }
 ```
 
-The `onFileDelete` handler also supports an optional `smb:Caller` parameter, which allows performing SMB operations from within the handler (e.g., logging the deletion to another file or cleaning up related resources):
+### Recovering from malformed CSV rows
+
+By default, one malformed row fails the whole file. Setting `csvFailSafe` on the listener or the client skips the bad rows and delivers the rest. Each skipped row is appended to a `<file-name>_error.log` file in the working directory of the Ballerina program. Use `contentType` to choose what is recorded for each skipped row: `smb:METADATA` (default), `smb:RAW`, or `smb:RAW_AND_METADATA`.
 
 ```ballerina
-service on remoteServer {
-    remote function onFileDelete(string deletedFile, smb:Caller caller) returns error? {
-        log:printInfo("File deleted: " + deletedFile);
-        // Log the deletion event to an audit file
-        check caller->putText("/audit/deletions.log", deletedFile + " was deleted\n");
-    }
-}
+listener smb:Listener smbListener = check new ({
+    host: "smb.example.com",
+    share: "reports",
+    csvFailSafe: {contentType: smb:RAW_AND_METADATA}
+});
 ```
 
-#### SMB Caller
+## Examples
 
-All content handler methods (`onFileText`, `onFileJson`, `onFileXml`, `onFileCsv`, `onFile`) and the `onFileDelete` handler support an optional `smb:Caller` parameter. The `Caller` object provides access to the SMB client, allowing you to perform operations on the SMB share from within the handler (e.g., writing response files, moving processed files, or reading related files).
+The `smb` module provides practical examples illustrating usage in various scenarios.
 
-```ballerina
-service on remoteServer {
-    remote function onFileText(string content, smb:Caller caller, smb:FileInfo fileInfo) returns error? {
-        log:printInfo("Processing text file: " + fileInfo.path);
-        
-        // Process the content and write a response
-        string response = "Processed: " + content;
-        check caller->putText("/processed/" + fileInfo.name, response);
-        
-        // Move the original file to archive
-        check caller->rename(fileInfo.path, "/archive/" + fileInfo.name);
-    }
-}
-```
+1. [Basic file operations](https://github.com/ballerina-platform/module-ballerina-smb/tree/main/examples/basic-file-operations) – Connects to a Kerberos-enabled SMB share, lists the root directory, writes a test file, verifies it exists, and reads it back.
 
-The SMB listener automatically routes files to the appropriate content handler based on file extension: `.txt` -> `onFileText()`, `.json` -> `onFileJson()`, `.xml` -> `onFileXml()`, `.csv` -> `onFileCsv()`, and other extensions -> `onFile()` (fallback handler). You can override the default routing using the `@smb:FunctionConfig` annotation to specify a custom file name pattern for each handler method.
+2. [Manage sales reports](https://github.com/ballerina-platform/module-ballerina-smb/tree/main/examples/sales-report) – Listens for JSON sales reports on an SMB share, flattens nested data into row records, appends them to a CSV data file, and moves the processed file to a designated folder.
 
-### Advanced configuration options
-
-The SMB client and listener support several advanced configuration options:
-
-#### SMB protocol dialects
-
-You can specify which SMB protocol versions to use:
-
-```ballerina
-smb:ClientConfiguration smbConfig = {
-    host: "<The SMB host>",
-    share: "<The SMB share name>",
-    dialects: [smb:SMB_3_1_1, smb:SMB_3_0_2, smb:SMB_3_0]
-};
-```
-
-Supported dialects: `SMB_3_1_1`, `SMB_3_0_2`, `SMB_3_0`, `SMB_2_1`, `SMB_2_0_2`
-
-#### Message signing and encryption
-
-Enable SMB message signing and data encryption for enhanced security:
-
-```ballerina
-smb:ClientConfiguration smbConfig = {
-    host: "<The SMB host>",
-    share: "<The SMB share name>",
-    signRequired: true,
-    encryptData: true,
-    auth: {
-        credentials: {
-            username: "<The SMB username>",
-            password: "<The SMB password>"
-        }
-    }
-};
-```
-
-##### Distributed File System (DFS) support
-
-Enable DFS support for accessing files across multiple servers:
-
-```ballerina
-smb:ClientConfiguration smbConfig = {
-    host: "<The SMB host>",
-    share: "<The SMB share name>",
-    enableDfs: true
-};
-```
-
-##### Buffer size and timeout configuration
-
-Configure buffer size and connection timeout:
-
-```ballerina
-smb:ClientConfiguration smbConfig = {
-    host: "<The SMB host>",
-    share: "<The SMB share name>",
-    bufferSize: 131072,
-    connectTimeout: 60.0
-};
-```
-
-### Examples
-
-The `ballerina/smb` connector provides practical examples illustrating usage in various scenarios.
-
-1. [Basic File Operations](https://github.com/ballerina-platform/module-ballerina-smb/tree/main/examples/basic-file-operations) – Connects to an SMB share (Kerberos-enabled), lists the root directory, writes a test file, verifies it exists, and reads it back.
-
-2. [Manage Sales Reports](https://github.com/ballerina-platform/module-ballerina-smb/tree/main/examples/sales-report) – Listens for JSON sales reports on an SMB share, flattens nested data into row records, appends them to a CSV data file, and moves the processed file to a designated folder.
-
-3. [Manage time sheets](https://github.com/ballerina-platform/module-ballerina-smb/tree/main/examples/timesheets) – Validates contractor timesheet CSVs from an SMB share, moves valid files to a processed location and writes cleaned copies, or quarantines invalid files with detailed error logs.
+3. [Manage timesheets](https://github.com/ballerina-platform/module-ballerina-smb/tree/main/examples/timesheets) – Validates contractor timesheet CSVs from an SMB share, moves valid files to a processed location and writes cleaned copies, or quarantines invalid files with detailed error logs.

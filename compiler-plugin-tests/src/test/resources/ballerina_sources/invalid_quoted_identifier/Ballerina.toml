@@ -1,0 +1,4 @@
+[package]
+org = "smb_test"
+name = "invalid_quoted_identifier"
+version = "0.1.0"

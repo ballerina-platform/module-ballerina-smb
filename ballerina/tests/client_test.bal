@@ -146,6 +146,7 @@ function testKerberosClientWithTicketCache() returns error? {
         "Kerberos ticket-cache client should fail when no TGT is available");
 }
 
+
 @test:Config {
     groups: ["client", "anonymous"]
 }

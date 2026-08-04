@@ -1,4 +1,4 @@
-# Basic file operations via SMB server
+# Basic file operations on an SMB share
 
 This example demonstrates connecting to an SMB server with Kerberos authentication and performing operations like listing, writing, and reading files on the server.
 

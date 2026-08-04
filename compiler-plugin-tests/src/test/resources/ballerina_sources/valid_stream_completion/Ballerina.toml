@@ -1,0 +1,4 @@
+[package]
+org = "smb_test"
+name = "valid_stream_completion"
+version = "0.1.0"
