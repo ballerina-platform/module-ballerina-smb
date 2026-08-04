@@ -40,7 +40,6 @@ int onDeleteListenerPatternCounter = 0;
 int afterProcessJsonDeleteCounter = 0;
 int afterErrorMoveOnFileCounter = 0;
 int onDeleteErrorCounter = 0;
-int onDeleteInvalidRegexCounter = 0;
 int noParamHandlerFileCounter = 0;
 int fallbackToOnFileCounter = 0;
 int afterProcessMoveTrailingSlashCounter = 0;
@@ -54,7 +53,6 @@ int afterErrorXmlMoveCounter = 0;
 int anonymousAuthFileCounter = 0;
 int noExtensionFileCounter = 0;
 int detachServiceCounter = 0;
-int invalidRegexContentHandlerCounter = 0;
 int csvEscapedQuotesCounter = 0;
 int missingAuthErrorCounter = 0;
 int panicHandlerErrorCounter = 0;
@@ -819,14 +817,11 @@ function testOnFileDeleteReturnsError() returns error? {
     groups: ["listener", "post-processing", "onFileDelete", "pattern"]
 }
 function testOnFileDeleteWithInvalidRegexPattern() returns error? {
-    onDeleteInvalidRegexCounter = 0;
-
     Service invalidRegexService = service object {
         @FunctionConfig {
             fileNamePattern: "[invalid_regex"
         }
         remote function onFileDelete(string deletedFile) returns error? {
-            onDeleteInvalidRegexCounter += 1;
         }
 
         remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
@@ -837,29 +832,17 @@ function testOnFileDeleteWithInvalidRegexPattern() returns error? {
         }
     };
 
-    boolean exists = check smbClient->exists("/invalid_regex_delete_tests");
-    if !exists {
-        check smbClient->mkdir("/invalid_regex_delete_tests");
-    }
-
     Listener invalidRegexListener = check new (POST_PROCESSING_LISTENER_CONFIG);
-    check invalidRegexListener.attach(invalidRegexService, "invalid_regex_delete_tests");
-    check invalidRegexListener.'start();
-    runtime:registerListener(invalidRegexListener);
+    error? result = invalidRegexListener.attach(invalidRegexService, "invalid_regex_delete_tests");
 
-    runtime:sleep(3);
-
-    onDeleteInvalidRegexCounter = 0;
-
-    check smbClient->putText("/invalid_regex_delete_tests/test.txt", "content");
-    runtime:sleep(3);
-    check smbClient->delete("/invalid_regex_delete_tests/test.txt");
-    runtime:sleep(5);
-
-    check invalidRegexListener.immediateStop();
-
-    test:assertEquals(onDeleteInvalidRegexCounter, 0,
-        "onFileDelete should NOT be triggered when fileNamePattern is an invalid regex");
+    test:assertTrue(result is error,
+        "attach should fail when the onFileDelete fileNamePattern is an invalid regex");
+    if result is error {
+        test:assertTrue(result.message().startsWith("Failed to register service:"),
+            "attach should report a service registration failure, found: " + result.message());
+        test:assertTrue(result.message().includes("Unclosed character class"),
+            "attach should report the regex syntax error, found: " + result.message());
+    }
 }
 
 @test:Config {
@@ -1433,15 +1416,12 @@ function testDetachServiceCallsDeregister() returns error? {
 @test:Config {
     groups: ["listener", "post-processing", "pattern"]
 }
-function testInvalidRegexOnContentHandlerSkipsFile() returns error? {
-    invalidRegexContentHandlerCounter = 0;
-
+function testInvalidRegexOnContentHandlerFailsAttach() returns error? {
     Service invalidRegexContentService = service object {
         @FunctionConfig {
             fileNamePattern: "[invalid_regex_pattern"
         }
         remote function onFileText(string content, FileInfo fileInfo) returns error? {
-            invalidRegexContentHandlerCounter += 1;
         }
 
         function onError(error err) returns error? {
@@ -1449,27 +1429,44 @@ function testInvalidRegexOnContentHandlerSkipsFile() returns error? {
         }
     };
 
-    boolean exists = check smbClient->exists("/invalid_regex_content_tests");
-    if !exists {
-        check smbClient->mkdir("/invalid_regex_content_tests");
-    }
-
     Listener invalidRegexContentListener = check new (POST_PROCESSING_LISTENER_CONFIG);
-    check invalidRegexContentListener.attach(invalidRegexContentService, "invalid_regex_content_tests");
-    check invalidRegexContentListener.'start();
-    runtime:registerListener(invalidRegexContentListener);
+    error? result = invalidRegexContentListener.attach(invalidRegexContentService,
+            "invalid_regex_content_tests");
 
-    runtime:sleep(3);
+    test:assertTrue(result is error,
+        "attach should fail when the content handler fileNamePattern is an invalid regex");
+    if result is error {
+        test:assertTrue(result.message().startsWith("Failed to register service:"),
+            "attach should report a service registration failure, found: " + result.message());
+        test:assertTrue(result.message().includes("Unclosed character class"),
+            "attach should report the regex syntax error, found: " + result.message());
+    }
+}
 
-    invalidRegexContentHandlerCounter = 0;
+// The listener level fileNamePattern is validated on the same path, when the listener is initialized.
+@test:Config {
+    groups: ["listener", "post-processing", "pattern"]
+}
+function testInvalidRegexOnListenerFailsInit() {
+    Listener|error invalidPatternListener = new ({
+        host: "localhost",
+        port: 445,
+        auth: {credentials: {username: "testuser", password: "testpass"}},
+        share: "testshare",
+        fileNamePattern: "[invalid_listener_pattern"
+    });
 
-    check smbClient->putText("/invalid_regex_content_tests/test.txt", "some content");
-    runtime:sleep(5);
-
-    check invalidRegexContentListener.immediateStop();
-
-    test:assertEquals(invalidRegexContentHandlerCounter, 0,
-        "onFileText should NOT be triggered when fileNamePattern is an invalid regex");
+    test:assertTrue(invalidPatternListener is error,
+        "init should fail when the listener fileNamePattern is an invalid regex");
+    if invalidPatternListener is error {
+        test:assertTrue(invalidPatternListener.message()
+                    .startsWith("Failed to initialize SMB listener:"),
+                "init should report a listener initialization failure, found: "
+                    + invalidPatternListener.message());
+        test:assertTrue(invalidPatternListener.message().includes("Unclosed character class"),
+                "init should report the regex syntax error, found: "
+                    + invalidPatternListener.message());
+    }
 }
 
 @test:Config {

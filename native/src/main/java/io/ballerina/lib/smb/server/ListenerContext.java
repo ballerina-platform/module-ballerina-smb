@@ -18,7 +18,17 @@
 
 package io.ballerina.lib.smb.server;
 
+import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BObject;
+import io.ballerina.runtime.api.values.BString;
 
-public record SmbService(BObject service, String path) {
+/**
+ * Encapsulates the listener wide state a dispatch reads. The caller is a function of the listener
+ * configuration alone — it has nothing to do with the path a given service monitors — so it belongs here
+ * rather than on each {@link ServiceContext}.
+ *
+ * @param config The listener configuration
+ * @param caller The listener's {@code smb:Caller}, or {@code null} when no attached service declares one
+ */
+public record ListenerContext(BMap<BString, Object> config, BObject caller) {
 }
