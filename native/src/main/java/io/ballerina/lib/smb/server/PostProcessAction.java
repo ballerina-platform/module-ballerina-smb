@@ -24,9 +24,6 @@ package io.ballerina.lib.smb.server;
  */
 public class PostProcessAction {
 
-    /**
-     * The kind of post-processing to perform.
-     */
     private enum ActionType {
         DELETE,
         MOVE

@@ -221,11 +221,6 @@ public class SmbListenerHelper {
         }
     }
 
-    /**
-     * Returns the single {@code smb:Caller} of the listener, creating it on first use. The caller is a pure
-     * function of the listener configuration, so every handler that declares one is handed the same instance
-     * rather than opening a connection, a session, and a share of its own per dispatch.
-     */
     private static Object getOrCreateCaller(BObject listenerEndpoint) {
         BObject caller = (BObject) listenerEndpoint.getNativeData(LISTENER_CALLER);
         if (caller != null) {
@@ -242,10 +237,6 @@ public class SmbListenerHelper {
         return createdCaller;
     }
 
-    /**
-     * Closes the listener's {@code smb:Caller}, releasing the connection, session, and share it holds. A caller
-     * a handler has already closed is a no-op.
-     */
     private static void closeCaller(BObject listenerEndpoint) {
         BObject caller = (BObject) listenerEndpoint.getNativeData(LISTENER_CALLER);
         if (caller == null) {
@@ -1053,12 +1044,6 @@ public class SmbListenerHelper {
                 StringUtils.fromString(message), null, null);
     }
 
-    /**
-     * Invokes the {@code onError} handler of the given service. The listener's {@code smb:Caller} is appended
-     * when the handler declares the optional second parameter, so that error handling can act on the server.
-     *
-     * @return false when the service declares no {@code onError}, leaving the caller to report the error
-     */
     private static boolean invokeOnErrorHandler(Environment env, ServiceContext context, BError bError,
                                                 ListenerContext listenerContext) {
         HandlerMethod handler = context.formatMethodsHolder().getOnErrorMethod();
