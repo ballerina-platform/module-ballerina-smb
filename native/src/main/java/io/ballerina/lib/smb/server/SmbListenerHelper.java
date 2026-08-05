@@ -1027,8 +1027,12 @@ public class SmbListenerHelper {
 
     private static void notifyServiceOnError(Environment env, ServiceContext context, Exception e,
                                              ListenerContext listenerContext) {
+        BError bError = createOnErrorValue(e);
         try {
-            invokeOnErrorHandler(env, context, createOnErrorValue(e), listenerContext);
+            if (!invokeOnErrorHandler(env, context, bError, listenerContext)) {
+                log.error("Error occurred and the service declares no onError method: {}",
+                        bError.getErrorMessage().getValue());
+            }
         } catch (Exception ignored) {
             log.debug("Error invoking onError: {}", ignored.getMessage());
         }
