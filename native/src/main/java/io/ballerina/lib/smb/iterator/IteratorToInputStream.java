@@ -97,9 +97,6 @@ public final class IteratorToInputStream implements Iterator<InputStream> {
         }
 
         byte[] bytes = toBytes(next);
-        if (bytes.length == 0) {
-            return null;
-        }
         isFirstRow = false;
         return new ByteArrayInputStream(bytes);
     }

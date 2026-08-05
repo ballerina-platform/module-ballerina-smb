@@ -92,6 +92,7 @@ import static io.ballerina.lib.smb.client.SmbClient.IS_EXECUTABLE;
 import static io.ballerina.lib.smb.client.SmbClient.IS_HIDDEN;
 import static io.ballerina.lib.smb.client.SmbClient.IS_WRITABLE;
 import static io.ballerina.lib.smb.client.SmbClient.ANONYMOUS_AUTH_DIALECT_ERROR;
+import static io.ballerina.lib.smb.client.SmbClient.DIALECT_NOT_SPECIFIED_ERROR;
 import static io.ballerina.lib.smb.client.SmbClient.DIALECT_SMB_2_0_2;
 import static io.ballerina.lib.smb.client.SmbClient.DIALECT_SMB_2_1;
 import static io.ballerina.lib.smb.client.SmbClient.MISSING_CREDENTIALS_FOR_AUTH_ERROR;
@@ -381,6 +382,9 @@ public class SmbListenerHelper {
         BMap<?, ?> authConfig = config.getMapValue(StringUtils.fromString(ENDPOINT_CONFIG_AUTH));
         boolean isAnonymous = (authConfig == null);
         BArray dialectsArray = config.getArrayValue(StringUtils.fromString(ENDPOINT_CONFIG_DIALECTS));
+        if (dialectsArray == null || dialectsArray.size() <= 0) {
+            throw new Exception(DIALECT_NOT_SPECIFIED_ERROR);
+        }
         List<SMB2Dialect> dialectList = new ArrayList<>();
         for (int i = 0; i < dialectsArray.size(); i++) {
             String dialect = dialectsArray.getBString(i).getValue();

@@ -632,12 +632,13 @@ public class SmbClient {
         SMB2CreateDisposition disposition = append ?
                 SMB2CreateDisposition.FILE_OPEN_IF : SMB2CreateDisposition.FILE_OVERWRITE_IF;
 
-        try (File file = share.openFile(filePath, accessMask, fileAttributes, SMB2ShareAccess.ALL,
+        try (InputStream in = inputStream;
+             File file = share.openFile(filePath, accessMask, fileAttributes, SMB2ShareAccess.ALL,
                 disposition, EnumSet.noneOf(SMB2CreateOptions.class));
              OutputStream outputStream = file.getOutputStream(append)) {
             byte[] buffer = new byte[ARRAY_SIZE];
             int bytesRead;
-            while ((bytesRead = inputStream.read(buffer)) != -1) {
+            while ((bytesRead = in.read(buffer)) != -1) {
                 outputStream.write(buffer, 0, bytesRead);
             }
             outputStream.flush();
