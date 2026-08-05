@@ -169,6 +169,37 @@ public isolated client class Caller {
         return self.'client->getCsv(path);
     }
 
+    # Writes a byte stream to a file on an SMB share.
+    # ```ballerina
+    # stream<byte[], error?> byteStream = check caller->getBytesAsStream(srcPath);
+    # smb:Error? response = caller->putBytesAsStream(destPath, byteStream, smb:OVERWRITE);
+    # ```
+    #
+    # + path - The resource path
+    # + content - Byte stream content to write
+    # + option - File write option (OVERWRITE or APPEND)
+    # + return - `()` or else an `smb:Error` if the operation fails
+    remote isolated function putBytesAsStream(string path, stream<byte[], error?> content,
+            FileWriteOption option = OVERWRITE) returns Error? {
+        return self.'client->putBytesAsStream(path, content, option);
+    }
+
+    # Writes a CSV stream to a file on an SMB share.
+    # Supports streams of string arrays or records.
+    # ```ballerina
+    # stream<string[], error?> csvStream = check caller->getCsvAsStream(srcPath);
+    # smb:Error? response = caller->putCsvAsStream(destPath, csvStream, smb:OVERWRITE);
+    # ```
+    #
+    # + path - The resource path
+    # + content - CSV stream content as a stream of string arrays or records
+    # + option - File write option (OVERWRITE or APPEND)
+    # + return - `()` or else an `smb:Error` if the operation fails
+    remote isolated function putCsvAsStream(string path, stream<string[]|record {}, error?> content,
+            FileWriteOption option = OVERWRITE) returns Error? {
+        return self.'client->putCsvAsStream(path, content, option);
+    }
+
     # Retrieves the file content as a byte stream from an SMB share.
     # ```ballerina
     # stream<byte[], error?> response = check caller->getBytesAsStream(path);
