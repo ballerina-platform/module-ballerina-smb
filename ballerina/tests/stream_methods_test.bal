@@ -416,6 +416,208 @@ function testStreamAndNonStreamApproaches() returns error? {
 }
 
 @test:Config {
+    groups: ["stream", "putBytesAsStream"]
+}
+function testPutBytesAsStreamOverwrite() returns error? {
+    string path = "/streamtest/put-bytes-stream-overwrite.bin";
+    byte[][] chunks = ["Hello ".toBytes(), "SMB ".toBytes(), "Stream".toBytes()];
+    stream<byte[], error?> byteStream = chunks.toStream();
+    check streamTestClient->putBytesAsStream(path, byteStream, OVERWRITE);
+
+    byte[]|Error result = streamTestClient->getBytes(path);
+    test:assertTrue(result is byte[], "Failed to read bytes written via stream");
+    if result is byte[] {
+        string resultStr = check string:fromBytes(result);
+        test:assertEquals(resultStr, "Hello SMB Stream", "Byte stream overwrite content mismatch");
+    }
+}
+
+@test:Config {
+    groups: ["stream", "putBytesAsStream"],
+    dependsOn: [testPutBytesAsStreamOverwrite]
+}
+function testPutBytesAsStreamAppend() returns error? {
+    string path = "/streamtest/put-bytes-stream-append.bin";
+    byte[][] initial = ["First ".toBytes()];
+    stream<byte[], error?> initialStream = initial.toStream();
+    check streamTestClient->putBytesAsStream(path, initialStream, OVERWRITE);
+
+    byte[][] appended = ["Second".toBytes()];
+    stream<byte[], error?> appendStream = appended.toStream();
+    check streamTestClient->putBytesAsStream(path, appendStream, APPEND);
+
+    byte[]|Error result = streamTestClient->getBytes(path);
+    test:assertTrue(result is byte[], "Failed to read appended bytes");
+    if result is byte[] {
+        string resultStr = check string:fromBytes(result);
+        test:assertEquals(resultStr, "First Second", "Byte stream append content mismatch");
+    }
+}
+
+@test:Config {
+    groups: ["stream", "putBytesAsStream"],
+    dependsOn: [testPutBytesAsStreamAppend]
+}
+function testPutBytesAsStreamLargeFile() returns error? {
+    string path = "/streamtest/put-bytes-stream-large.bin";
+    byte[][] chunks = [];
+    byte[] expectedResult = [];
+    foreach int i in 0 ..< 100 {
+        byte[] chunk = [];
+        foreach int j in 0 ..< 200 {
+            byte b = <byte>((i * 200 + j) % 256);
+            chunk.push(b);
+            expectedResult.push(b);
+        }
+        chunks.push(chunk);
+    }
+    stream<byte[], error?> byteStream = chunks.toStream();
+    check streamTestClient->putBytesAsStream(path, byteStream, OVERWRITE);
+
+    byte[]|Error result = streamTestClient->getBytes(path);
+    test:assertTrue(result is byte[], "Failed to read large byte stream");
+    if result is byte[] {
+        test:assertEquals(result.length(), 20000, "Large byte stream length mismatch");
+        test:assertEquals(result, expectedResult, "Large byte stream content mismatch");
+    }
+}
+
+// ── putCsvAsStream tests (string[]) ─────────────────────────────────────
+
+@test:Config {
+    groups: ["stream", "putCsvAsStream"]
+}
+function testPutCsvAsStreamStringArrayOverwrite() returns error? {
+    string path = "/streamtest/put-csv-stream-string-overwrite.csv";
+    string[][] rows = [["Alice", "25", "New York"], ["Bob", "30", "Boston"]];
+    stream<string[], error?> csvStream = rows.toStream();
+    check streamTestClient->putCsvAsStream(path, csvStream, OVERWRITE);
+
+    string|Error result = streamTestClient->getText(path);
+    test:assertTrue(result is string, "Failed to read CSV written via stream");
+    if result is string {
+        test:assertTrue(result.includes("Alice"), "CSV should contain Alice");
+        test:assertTrue(result.includes("Bob"), "CSV should contain Bob");
+    }
+}
+
+@test:Config {
+    groups: ["stream", "putCsvAsStream"],
+    dependsOn: [testPutCsvAsStreamStringArrayOverwrite]
+}
+function testPutCsvAsStreamStringArrayAppend() returns error? {
+    string path = "/streamtest/put-csv-stream-string-append.csv";
+    string[][] initial = [["Alice", "25", "New York"]];
+    stream<string[], error?> initialStream = initial.toStream();
+    check streamTestClient->putCsvAsStream(path, initialStream, OVERWRITE);
+
+    string[][] appended = [["Bob", "30", "Boston"]];
+    stream<string[], error?> appendStream = appended.toStream();
+    check streamTestClient->putCsvAsStream(path, appendStream, APPEND);
+
+    string|Error result = streamTestClient->getText(path);
+    test:assertTrue(result is string, "Failed to read appended CSV");
+    if result is string {
+        test:assertTrue(result.includes("Alice"), "CSV should contain Alice");
+        test:assertTrue(result.includes("Bob"), "CSV should contain Bob");
+    }
+}
+
+@test:Config {
+    groups: ["stream", "putCsvAsStream", "putCsvAsStreamRecord"]
+}
+function testPutCsvAsStreamRecordOverwrite() returns error? {
+    string path = "/streamtest/put-csv-stream-record-overwrite.csv";
+    Employee[] records = [
+        {name: "Alice", age: 25, department: "Engineering"},
+        {name: "Bob", age: 30, department: "Marketing"}
+    ];
+    stream<Employee, error?> csvStream = records.toStream();
+    check streamTestClient->putCsvAsStream(path, csvStream, OVERWRITE);
+
+    string|Error result = streamTestClient->getText(path);
+    test:assertTrue(result is string, "Failed to read record CSV written via stream");
+    if result is string {
+        test:assertTrue(result.includes("name"), "CSV should contain header 'name'");
+        test:assertTrue(result.includes("age"), "CSV should contain header 'age'");
+        test:assertTrue(result.includes("department"), "CSV should contain header 'department'");
+        test:assertTrue(result.includes("Alice"), "CSV should contain Alice");
+        test:assertTrue(result.includes("Bob"), "CSV should contain Bob");
+    }
+}
+
+@test:Config {
+    groups: ["stream", "putCsvAsStream", "putCsvAsStreamRecord"],
+    dependsOn: [testPutCsvAsStreamRecordOverwrite]
+}
+function testPutCsvAsStreamRecordAppend() returns error? {
+    string path = "/streamtest/put-csv-stream-record-append.csv";
+    Employee[] initial = [{name: "Alice", age: 25, department: "Engineering"}];
+    stream<Employee, error?> initialStream = initial.toStream();
+    check streamTestClient->putCsvAsStream(path, initialStream, OVERWRITE);
+
+    Employee[] appended = [{name: "Bob", age: 30, department: "Marketing"}];
+    stream<Employee, error?> appendStream = appended.toStream();
+    check streamTestClient->putCsvAsStream(path, appendStream, APPEND);
+
+    string|Error result = streamTestClient->getText(path);
+    test:assertTrue(result is string, "Failed to read appended record CSV");
+    if result is string {
+        test:assertTrue(result.includes("Alice"), "CSV should contain Alice");
+        test:assertTrue(result.includes("Bob"), "CSV should contain Bob");
+        // Header should appear only once (from OVERWRITE, not from APPEND)
+        int nameHeaderCount = 0;
+        int index = 0;
+        while true {
+            int? found = result.indexOf("name,age,department", index);
+            if found is () {
+                break;
+            }
+            nameHeaderCount += 1;
+            index = found + 1;
+        }
+        test:assertEquals(nameHeaderCount, 1, "Header should appear only once");
+    }
+}
+
+@test:Config {
+    groups: ["stream", "putBytesAsStream", "integration"],
+    dependsOn: [testPutBytesAsStreamLargeFile]
+}
+function testPutBytesAsStreamRoundTrip() returns error? {
+    string srcPath = "/streamtest/bytes-stream-basic.bin";
+    string destPath = "/streamtest/put-bytes-stream-roundtrip.bin";
+
+    // Read as stream, then write as stream
+    stream<byte[], error?> byteStream = check streamTestClient->getBytesAsStream(srcPath);
+    check streamTestClient->putBytesAsStream(destPath, byteStream, OVERWRITE);
+
+    byte[]|Error srcContent = streamTestClient->getBytes(srcPath);
+    byte[]|Error destContent = streamTestClient->getBytes(destPath);
+    test:assertTrue(srcContent is byte[] && destContent is byte[], "Both files should be readable");
+    if srcContent is byte[] && destContent is byte[] {
+        test:assertEquals(destContent, srcContent, "Round-trip byte stream content mismatch");
+    }
+}
+
+@test:Config {
+    groups: ["stream", "putCsvAsStream", "integration"],
+    dependsOn: [testPutCsvAsStreamRecordAppend]
+}
+function testPutCsvAsStreamRoundTrip() returns error? {
+    string srcPath = "/streamtest/csv-stream-string-array.csv";
+    string destPath = "/streamtest/put-csv-stream-roundtrip.csv";
+
+    // Read as stream, then write as stream
+    stream<string[], error?> csvStream = check streamTestClient->getCsvAsStream(srcPath);
+    check streamTestClient->putCsvAsStream(destPath, csvStream, OVERWRITE);
+
+    string|Error srcContent = streamTestClient->getText(srcPath);
+    string|Error destContent = streamTestClient->getText(destPath);
+    test:assertTrue(srcContent is string && destContent is string, "Both files should be readable");
+}
+
+@test:Config {
     groups: ["stream", "integration"],
     dependsOn: [testStreamAndNonStreamApproaches]
 }

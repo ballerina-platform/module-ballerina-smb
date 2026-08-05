@@ -30,7 +30,6 @@ int kerbNoKeytabNoCredsCounter = 0;
 int kerbInvalidKeytabCounter = 0;
 int kerbPasswordBasedCounter = 0;
 int kerbTicketCacheCounter = 0;
-int listenerStringArrayAttachCounter = 0;
 
 // Test 1: kerberosConfig with principal only (no keytab, no credentials).
 // Covers the `credentials == null && !hasKeytab` branch in createAuthContext that throws
@@ -241,12 +240,9 @@ function testKerberosListenerTicketCacheFallback() returns error? {
     groups: ["listener", "attach"],
     dependsOn: [testKerberosListenerTicketCacheFallback]
 }
-function testAttachWithStringArrayNameIsNoOp() returns error? {
-    listenerStringArrayAttachCounter = 0;
-
+function testAttachWithStringArrayNameReturnsError() returns error? {
     Service stringArrayAttachService = service object {
         remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
-            listenerStringArrayAttachCounter += 1;
         }
     };
 
@@ -264,27 +260,10 @@ function testAttachWithStringArrayNameIsNoOp() returns error? {
         bufferSize: 65536
     });
 
-    // Passing a string[] as name: the service is silently not registered
+    // Passing a string[] as name should return an error
     error? result = stringArrayListener.attach(stringArrayAttachService, ["path1", "path2"]);
-    test:assertEquals(result, (), "attach with string[] should return () without error");
-
-    check stringArrayListener.'start();
-    runtime:registerListener(stringArrayListener);
-
-    Error? mkdirResult = smbClient->mkdir("/string_array_attach_test");
-    if mkdirResult is Error {
-        io:println("Directory may already exist: " + mkdirResult.message());
-    }
-    check smbClient->putBytes("/string_array_attach_test/trigger.bin", "no-op test".toBytes());
-
-    // Wait long enough for at least two poll cycles (pollingInterval = 2 s)
-    runtime:sleep(6);
-
-    check stringArrayListener.immediateStop();
-
-    // The service was never registered so no files should be processed
-    test:assertEquals(listenerStringArrayAttachCounter, 0,
-        "No files should be processed when service is attached with a string[] name");
+    test:assertTrue(result is error,
+        "attach with string[] name should return an error");
 }
 
 int kerbOnErrorReturnsErrCounter = 0;
@@ -292,7 +271,7 @@ boolean kerbNotifyServicesOnErrorCovered = false;
 
 @test:Config {
     groups: ["listener", "kerberos"],
-    dependsOn: [testAttachWithStringArrayNameIsNoOp]
+    dependsOn: [testAttachWithStringArrayNameReturnsError]
 }
 function testNotifyServicesOnErrorWhenOnErrorReturnsError() returns error? {
     kerbOnErrorReturnsErrCounter = 0;

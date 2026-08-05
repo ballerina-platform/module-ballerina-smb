@@ -87,7 +87,11 @@ service "timesheetValidator" on smbListener {
         
         // Save validated records to SMB
         string validatedPath = string `/timesheets/validated/${fileInfo.name}`;
-        check caller->putCsv(validatedPath, <record{}[][]>[content], smb:OVERWRITE);
+        string[][] csvContent = [["contractor_id", "date", "hours_worked", "site_code"]];
+        foreach TimesheetRecord r in content {
+            csvContent.push([r.contractor_id, r.date, r.hours_worked, r.site_code]);
+        }
+        check caller->putCsv(validatedPath, csvContent, smb:OVERWRITE);
         log:printInfo(string `Validated ${content.length()} records saved to ${validatedPath}`);
         
         // Move original file to processed folder

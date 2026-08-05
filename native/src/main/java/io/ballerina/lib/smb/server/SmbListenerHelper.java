@@ -22,9 +22,11 @@ import com.hierynomus.msdtyp.AccessMask;
 import com.hierynomus.msfscc.FileAttributes;
 import com.hierynomus.msfscc.fileinformation.FileIdBothDirectoryInformation;
 import com.hierynomus.mssmb2.SMB2CreateDisposition;
+import com.hierynomus.mssmb2.SMB2Dialect;
 import com.hierynomus.mssmb2.SMB2ShareAccess;
 import com.hierynomus.protocol.commons.EnumWithValue;
 import com.hierynomus.smbj.SMBClient;
+import com.hierynomus.smbj.SmbConfig;
 import com.hierynomus.smbj.auth.AuthenticationContext;
 import com.hierynomus.smbj.auth.GSSAuthenticationContext;
 import com.hierynomus.smbj.connection.Connection;
@@ -89,7 +91,12 @@ import static io.ballerina.lib.smb.client.SmbClient.IS_DIRECTORY;
 import static io.ballerina.lib.smb.client.SmbClient.IS_EXECUTABLE;
 import static io.ballerina.lib.smb.client.SmbClient.IS_HIDDEN;
 import static io.ballerina.lib.smb.client.SmbClient.IS_WRITABLE;
+import static io.ballerina.lib.smb.client.SmbClient.ANONYMOUS_AUTH_DIALECT_ERROR;
+import static io.ballerina.lib.smb.client.SmbClient.DIALECT_NOT_SPECIFIED_ERROR;
+import static io.ballerina.lib.smb.client.SmbClient.DIALECT_SMB_2_0_2;
+import static io.ballerina.lib.smb.client.SmbClient.DIALECT_SMB_2_1;
 import static io.ballerina.lib.smb.client.SmbClient.MISSING_CREDENTIALS_FOR_AUTH_ERROR;
+import static io.ballerina.lib.smb.client.SmbClient.mapDialect;
 import static io.ballerina.lib.smb.client.SmbClient.MODIFIED_AT;
 import static io.ballerina.lib.smb.client.SmbClient.NAME;
 import static io.ballerina.lib.smb.client.SmbClient.PATH;
@@ -162,6 +169,7 @@ public class SmbListenerHelper {
     public static final String LISTENER_NOT_INITIALIZED_ERROR = "Listener is not initialized";
     public static final String ENDPOINT_CONFIG_CSV_FAIL_SAFE = "csvFailSafe";
     public static final String ENDPOINT_CONFIG_LAX_DATA_BINDING = "laxDataBinding";
+    public static final String ENDPOINT_CONFIG_DIALECTS = "dialects";
     public static final BString SIZE = StringUtils.fromString("size");
 
     private SmbListenerHelper() {
@@ -372,8 +380,23 @@ public class SmbListenerHelper {
         String share = config.getStringValue(StringUtils.fromString(ENDPOINT_CONFIG_SHARE)).getValue();
         int port = config.getIntValue(StringUtils.fromString(ENDPOINT_CONFIG_PORT)).intValue();
         BMap<?, ?> authConfig = config.getMapValue(StringUtils.fromString(ENDPOINT_CONFIG_AUTH));
+        boolean isAnonymous = (authConfig == null);
+        BArray dialectsArray = config.getArrayValue(StringUtils.fromString(ENDPOINT_CONFIG_DIALECTS));
+        if (dialectsArray == null || dialectsArray.size() <= 0) {
+            throw new Exception(DIALECT_NOT_SPECIFIED_ERROR);
+        }
+        List<SMB2Dialect> dialectList = new ArrayList<>();
+        for (int i = 0; i < dialectsArray.size(); i++) {
+            String dialect = dialectsArray.getBString(i).getValue();
+            if (isAnonymous && !DIALECT_SMB_2_1.equals(dialect) && !DIALECT_SMB_2_0_2.equals(dialect)) {
+                throw new Exception(ANONYMOUS_AUTH_DIALECT_ERROR);
+            }
+            dialectList.add(mapDialect(dialect));
+        }
         AuthenticationContext authContext = createAuthContext(authConfig);
-        SMBClient smbClient = new SMBClient();
+        SMBClient smbClient = new SMBClient(SmbConfig.builder()
+                .withDialects(dialectList.toArray(new SMB2Dialect[0]))
+                .build());
         Connection connection = smbClient.connect(host, port);
         Session session = connection.authenticate(authContext);
         DiskShare diskShare = (DiskShare) session.connectShare(share);
@@ -612,12 +635,12 @@ public class SmbListenerHelper {
         }
         for (ServiceContext context : servicesToNotify) {
             HandlerMethod handler = context.formatMethodsHolder().getOnFileDeleteMethod();
-            if (handler == null) {
-                continue;
-            }
-            for (String deletedFile : deletedFiles) {
-                if (handler.matchesFileName(fileNameOf(deletedFile))) {
-                    invokeOnFileDeleteHandler(env, context, handler, deletedFile, listenerContext);
+            if (handler != null) {
+                for (String deletedFile : deletedFiles) {
+                    String fileName = fileNameOf(deletedFile);
+                    if (handler.matchesFileName(fileName)) {
+                        invokeOnFileDeleteHandler(env, context, handler, deletedFile, listenerContext);
+                    }
                 }
             }
         }
@@ -637,8 +660,8 @@ public class SmbListenerHelper {
             Object result = env.getRuntime().callMethod(context.service(), ON_FILE_DELETE,
                     new StrandMetadata(handler.isConcurrentSafe(), null), args.toArray());
             if (result instanceof BError bError) {
-                notifyServiceOnError(env, context, new Exception(bError.getErrorMessage().getValue()),
-                        listenerContext);
+                notifyServiceOnError(env, context,
+                        new Exception(bError.getErrorMessage().getValue()), listenerContext);
             }
         } catch (Exception e) {
             notifyServiceOnError(env, context, e, listenerContext);
@@ -1007,9 +1030,8 @@ public class SmbListenerHelper {
         BError bError = createOnErrorValue(e);
         try {
             if (!invokeOnErrorHandler(env, context, bError, listenerContext)) {
-                // A data binding or handler failure for one file, with no onError to report it to. The stack
-                // trace is what tells the developer which conversion or handler gave way.
-                bError.printStackTrace();
+                log.error("Error occurred and the service declares no onError method: {}",
+                        bError.getErrorMessage().getValue());
             }
         } catch (Exception ignored) {
             log.debug("Error invoking onError: {}", ignored.getMessage());

@@ -408,28 +408,21 @@ function testClientKerberosWithInvalidKeytab() returns error? {
 }
 
 // ── Test 9: anonymous auth with only high-version dialects ────────────────
-// In initClientEndpoint, anonymous auth filters out dialects higher than
-// SMB_2_1.  When only SMB_3_1_1 is provided, dialectList becomes empty
-// after filtering and the fallback (SMB_2_1 + SMB_2_0_2) is added.
-// The connection will ultimately succeed or fail depending on the server;
-// the filtering branch is the target.
+// In initClientEndpoint, anonymous auth rejects dialects higher than
+// SMB_2_1.  When only SMB_3_1_1 is provided, the client should return
+// an error immediately.
 @test:Config {
     groups: ["client"],
     dependsOn: [testClientKerberosWithInvalidKeytab]
 }
 function testAnonymousAuthWithHighDialectsOnly() returns error? {
-    // Anonymous auth (no auth field) + only SMB_3_1_1 →
-    // after filtering, dialectList is empty → fallback dialects added
+    // Anonymous auth (no auth field) + only SMB_3_1_1 → error
     Client|Error result = new ({
         host: "localhost",
         port: 445,
         share: "publicshare",
         dialects: [SMB_3_1_1]
     });
-    // The branch is covered regardless of whether the connection succeeds.
-    // (The publicshare share may or may not exist; either outcome is fine.)
-    test:assertTrue(true, "Anonymous client with high dialects should not panic");
-    if result is Client {
-        Error? res = result->close();
-    }
+    test:assertTrue(result is Error,
+        "Anonymous auth with incompatible dialect (SMB_3_1_1) should return an error");
 }

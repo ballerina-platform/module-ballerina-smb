@@ -80,6 +80,17 @@ public class CSVUtils {
         return row.toString();
     }
 
+    public static String convertRecordToCsvRow(BMap<BString, Object> balRecord, boolean includeHeader) {
+        BString[] keys = balRecord.getKeys();
+        StringBuilder result = new StringBuilder();
+        if (includeHeader) {
+            result.append(keysToRow(keys));
+            result.append(System.lineSeparator());
+        }
+        result.append(recordToCsvRow(balRecord, keys));
+        return result.toString();
+    }
+
     private static String recordToCsvRow(BMap<BString, Object> balRecord, BString[] keys) {
         StringBuilder row = new StringBuilder();
         for (int i = 0; i < keys.length; i++) {

@@ -138,7 +138,38 @@ public isolated client class Client {
     # + content - CSV content as array of arrays or array of records
     # + option - File write option (OVERWRITE or APPEND)
     # + return - `()` or else an `smb:Error` if the operation fails
-    remote isolated function putCsv(string path, string[][]|record {}[][] content,
+    remote isolated function putCsv(string path, string[][]|record {}[] content,
+            FileWriteOption option = OVERWRITE) returns Error? = @java:Method {
+        'class: "io.ballerina.lib.smb.client.SmbClient"
+    } external;
+
+    # Writes a byte stream to a file on an SMB share.
+    # ```ballerina
+    # stream<byte[], error?> byteStream = check client->getBytesAsStream(srcPath);
+    # smb:Error? response = client->putBytesAsStream(destPath, byteStream, smb:OVERWRITE);
+    # ```
+    #
+    # + path - The resource path
+    # + content - Byte stream content to write
+    # + option - File write option (OVERWRITE or APPEND)
+    # + return - `()` or else an `smb:Error` if the operation fails
+    remote isolated function putBytesAsStream(string path, stream<byte[], error?> content,
+            FileWriteOption option = OVERWRITE) returns Error? = @java:Method {
+        'class: "io.ballerina.lib.smb.client.SmbClient"
+    } external;
+
+    # Writes a CSV stream to a file on an SMB share.
+    # Supports streams of string arrays or records.
+    # ```ballerina
+    # stream<string[], error?> csvStream = check client->getCsvAsStream(srcPath);
+    # smb:Error? response = client->putCsvAsStream(destPath, csvStream, smb:OVERWRITE);
+    # ```
+    #
+    # + path - The resource path
+    # + content - CSV stream content as a stream of string arrays or records
+    # + option - File write option (OVERWRITE or APPEND)
+    # + return - `()` or else an `smb:Error` if the operation fails
+    remote isolated function putCsvAsStream(string path, stream<string[]|record {}, error?> content,
             FileWriteOption option = OVERWRITE) returns Error? = @java:Method {
         'class: "io.ballerina.lib.smb.client.SmbClient"
     } external;
@@ -208,7 +239,7 @@ public isolated client class Client {
     # + path - The resource path
     # + targetType - The type descriptor of the target type (default: string[][])
     # + return - CSV content as the target type or an `smb:Error` if the operation fails
-    remote isolated function getCsv(string path, typedesc<anydata[][]> targetType = <>)
+    remote isolated function getCsv(string path, typedesc<string[][]|record {}[]> targetType = <>)
             returns targetType|Error = @java:Method {
         'class: "io.ballerina.lib.smb.client.SmbClient"
     } external;

@@ -549,14 +549,56 @@ function testPutCsvEmptyValues() returns error? {
 @test:Config {
     groups: ["put", "putCsv", "putCsvRecords"]
 }
+function testPutCsvRecordArray() returns error? {
+    string path = "/test/put-csv-record-array.csv";
+    Person[] records = [
+        {name: "Alice, Jr.", age: 25, city: "New York"},
+        {name: "Bob", age: 30, city: "Boston, MA"},
+        {name: "Charlie", age: 35, city: "Chicago"}
+    ];
+    check testClient->putCsv(path, records, OVERWRITE);
+    string|Error result = testClient->getText(path);
+    test:assertTrue(result is string, "putCsv with record[] should write successfully");
+    if result is string {
+        // Header row should be present (addHeader=true when not APPEND)
+        test:assertTrue(result.includes("name"), "CSV should contain header 'name'");
+        test:assertTrue(result.includes("age"), "CSV should contain header 'age'");
+        // Values with commas are quoted
+        test:assertTrue(result.includes("Alice"), "CSV should contain Alice");
+        test:assertTrue(result.includes("Boston"), "CSV should contain Boston");
+    }
+}
+
+@test:Config {
+    groups: ["put", "putCsv", "putCsvRecords"],
+    dependsOn: [testPutCsvRecordArray]
+}
+function testPutCsvRecordArrayAppend() returns error? {
+    string path = "/test/put-csv-record-array-append.csv";
+    Person[] initial = [{name: "Alice", age: 25, city: "New York"}];
+    Person[] additional = [{name: "Bob", age: 30, city: "Boston"}];
+    check testClient->putCsv(path, initial, OVERWRITE);
+    check testClient->putCsv(path, additional, APPEND);
+    string|Error result = testClient->getText(path);
+    test:assertTrue(result is string, "putCsv with record[] append should write successfully");
+    if result is string {
+        test:assertTrue(result.includes("Alice"), "Should contain initial record");
+        test:assertTrue(result.includes("Bob"), "Should contain appended record");
+    }
+}
+
+@test:Config {
+    groups: ["put", "putCsv", "putCsvRecords"],
+    dependsOn: [testPutCsvRecordArrayAppend]
+}
 function testPutCsvRecordsAppendNoHeader() returns error? {
     string path = "/test/put-csv-records-append.csv";
-    Person[][] initial = [[
+    Person[] initial = [
         {name: "Alice", age: 25, city: "New York"}
-    ]];
-    Person[][] additional = [[
+    ];
+    Person[] additional = [
         {name: "Bob", age: 30, city: "Boston"}
-    ]];
+    ];
     check testClient->putCsv(path, initial, OVERWRITE);
     check testClient->putCsv(path, additional, APPEND);
     string|Error result = testClient->getText(path);

@@ -639,9 +639,15 @@ function testOnFileXmlHandler() returns error? {
         bufferSize: 65536
     });
 
-    check xmlListener.attach(contentHandlerService);
+    check xmlListener.attach(contentHandlerService, "content_tests");
     check xmlListener.'start();
     runtime:registerListener(xmlListener);
+
+    runtime:sleep(3);
+
+    xmlFileCounter = 0;
+    capturedXmlContent = ();
+    capturedXmlFileName = ();
 
     string xmlContent = "<config><database>mysql</database><timeout>30</timeout></config>";
     error? putResult = smbClient->putBytes("/content_tests/config.xml", xmlContent.toBytes());

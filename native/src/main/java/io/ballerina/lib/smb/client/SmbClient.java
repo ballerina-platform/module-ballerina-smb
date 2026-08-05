@@ -37,6 +37,7 @@ import com.hierynomus.smbj.share.DiskShare;
 import com.hierynomus.smbj.share.File;
 import io.ballerina.lib.smb.iterator.ByteIterator;
 import io.ballerina.lib.smb.iterator.CsvIterator;
+import io.ballerina.lib.smb.iterator.IteratorToInputStream;
 import io.ballerina.lib.smb.util.CSVUtils;
 import io.ballerina.lib.smb.util.ModuleUtils;
 import io.ballerina.lib.smb.util.SmbContentConverter;
@@ -54,6 +55,7 @@ import io.ballerina.runtime.api.values.BArray;
 import io.ballerina.runtime.api.values.BDecimal;
 import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BObject;
+import io.ballerina.runtime.api.values.BStream;
 import io.ballerina.runtime.api.values.BString;
 import io.ballerina.runtime.api.values.BTypedesc;
 import org.slf4j.Logger;
@@ -63,12 +65,15 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.SequenceInputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -133,6 +138,9 @@ public class SmbClient {
     public static final String MISSING_CREDENTIALS_FOR_KERBEROS_ERROR =
             "Credentials with password must be provided for Kerberos authentication when keytab is not specified";
     public static final String DIALECT_NOT_SPECIFIED_ERROR = "At least one dialect must be specified";
+    public static final String ANONYMOUS_AUTH_DIALECT_ERROR =
+            "Anonymous authentication is only compatible with SMB_2_1 and SMB_2_0_2 dialects. "
+            + "Please restrict the dialects configuration to SMB_2_1 and/or SMB_2_0_2.";
 
     private static final Set<String> EXECUTABLE_EXTENSIONS = Set.of(
             "exe", "bat", "cmd", "com", "msi", "ps1", "vbs", "wsf", "jar"
@@ -233,13 +241,14 @@ public class SmbClient {
             }
             List<SMB2Dialect> dialectList = IntStream.range(0, dialectsArray.size())
                     .mapToObj(i -> mapDialect(dialectsArray.getBString(i).getValue()))
-                    .filter(dialect -> !isAnonymous ||
-                            dialect == SMB2Dialect.SMB_2_0_2 || dialect == SMB2Dialect.SMB_2_1)
                     .collect(Collectors.toList());
 
-            if (isAnonymous && dialectList.isEmpty()) {
-                dialectList.add(SMB2Dialect.SMB_2_1);
-                dialectList.add(SMB2Dialect.SMB_2_0_2);
+            if (isAnonymous) {
+                boolean hasIncompatibleDialect = dialectList.stream()
+                        .anyMatch(d -> d != SMB2Dialect.SMB_2_0_2 && d != SMB2Dialect.SMB_2_1);
+                if (hasIncompatibleDialect) {
+                    return SmbUtil.createError(CLIENT_INITIALIZATION_ERROR + ANONYMOUS_AUTH_DIALECT_ERROR, SMB_ERROR);
+                }
             }
             SMB2Dialect[] dialects = dialectList.toArray(new SMB2Dialect[0]);
             configBuilder.withDialects(dialects);
@@ -256,7 +265,7 @@ public class SmbClient {
             log.debug("SMB client initialized successfully for host: {} share: {}", host, share);
             return null;
         } catch (Exception exception) {
-            return SmbUtil.createError(CLIENT_INITIALIZATION_ERROR + exception.getMessage(), SMB_ERROR);
+            return SmbUtil.createError(CLIENT_INITIALIZATION_ERROR + exception.getMessage(), exception, SMB_ERROR);
         }
     }
 
@@ -334,7 +343,7 @@ public class SmbClient {
         });
     }
 
-    private static SMB2Dialect mapDialect(String dialectStr) {
+    public static SMB2Dialect mapDialect(String dialectStr) {
         switch (dialectStr) {
             case DIALECT_SMB_3_1_1 -> {
                 return SMB2Dialect.SMB_3_1_1;
@@ -603,11 +612,37 @@ public class SmbClient {
         SMB2CreateDisposition disposition = append ?
                 SMB2CreateDisposition.FILE_OPEN_IF : SMB2CreateDisposition.FILE_OVERWRITE_IF;
 
-        File file = share.openFile(filePath, accessMask, fileAttributes, SMB2ShareAccess.ALL,
+        try (File file = share.openFile(filePath, accessMask, fileAttributes, SMB2ShareAccess.ALL,
                 disposition, EnumSet.noneOf(SMB2CreateOptions.class));
-        OutputStream outputStream = file.getOutputStream(append);
-        outputStream.write(bytes);
-        outputStream.flush();
+             OutputStream outputStream = file.getOutputStream(append)) {
+            outputStream.write(bytes);
+            outputStream.flush();
+        }
+    }
+
+    private static void writeFileFromStream(BObject clientEndpoint, String filePath,
+                                            InputStream inputStream, boolean append) throws IOException {
+        DiskShare share = retrieveShare(clientEndpoint);
+        Set<AccessMask> accessMask = new HashSet<>();
+        accessMask.add(AccessMask.GENERIC_WRITE);
+
+        Set<FileAttributes> fileAttributes = new HashSet<>();
+        fileAttributes.add(FileAttributes.FILE_ATTRIBUTE_NORMAL);
+
+        SMB2CreateDisposition disposition = append ?
+                SMB2CreateDisposition.FILE_OPEN_IF : SMB2CreateDisposition.FILE_OVERWRITE_IF;
+
+        try (InputStream in = inputStream;
+             File file = share.openFile(filePath, accessMask, fileAttributes, SMB2ShareAccess.ALL,
+                disposition, EnumSet.noneOf(SMB2CreateOptions.class));
+             OutputStream outputStream = file.getOutputStream(append)) {
+            byte[] buffer = new byte[ARRAY_SIZE];
+            int bytesRead;
+            while ((bytesRead = in.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+            }
+            outputStream.flush();
+        }
     }
 
     private static Session authenticateSession(Connection connection, BObject clientEndpoint) throws IOException {
@@ -891,6 +926,60 @@ public class SmbClient {
                 return SmbUtil.createError(WRITE_CSV_FILE_ERROR + e.getMessage(), SMB_ERROR);
             }
         });
+    }
+
+    public static Object putBytesAsStream(Environment env, BObject clientEndpoint, BString filePath,
+                                           BStream inputContent, BString option) {
+        return env.yieldAndRun(() -> {
+            try {
+                InputStream stream = createInputStreamFromIterator(env, inputContent.getIteratorObj());
+                boolean append = WRITE_OPTION_APPEND.equals(option.getValue());
+                writeFileFromStream(clientEndpoint, filePath.getValue(), stream, append);
+                return null;
+            } catch (Exception e) {
+                return SmbUtil.createError(WRITE_FILE_ERROR + e.getMessage(), SMB_ERROR);
+            }
+        });
+    }
+
+    public static Object putCsvAsStream(Environment env, BObject clientEndpoint, BString filePath,
+                                         BStream inputContent, BString option) {
+        return env.yieldAndRun(() -> {
+            try {
+                boolean append = WRITE_OPTION_APPEND.equals(option.getValue());
+                boolean addHeader = !append;
+                InputStream stream = createInputStreamFromIterator(env, inputContent.getIteratorObj(), addHeader);
+                writeFileFromStream(clientEndpoint, filePath.getValue(), stream, append);
+                return null;
+            } catch (Exception e) {
+                return SmbUtil.createError(WRITE_CSV_FILE_ERROR + e.getMessage(), SMB_ERROR);
+            }
+        });
+    }
+
+    private static InputStream createInputStreamFromIterator(Environment environment, BObject iterator) {
+        IteratorToInputStream streamIterator = new IteratorToInputStream(environment, iterator);
+        return new SequenceInputStream(asEnumeration(streamIterator));
+    }
+
+    private static InputStream createInputStreamFromIterator(Environment environment, BObject iterator,
+                                                             boolean addHeader) {
+        IteratorToInputStream streamIterator = new IteratorToInputStream(environment, iterator, addHeader);
+        return new SequenceInputStream(asEnumeration(streamIterator));
+    }
+
+    private static <T> Enumeration<T> asEnumeration(Iterator<T> iterator) {
+        return new Enumeration<T>() {
+            @Override
+            public boolean hasMoreElements() {
+                return iterator.hasNext();
+            }
+
+            @Override
+            public T nextElement() {
+                return iterator.next();
+            }
+        };
     }
 
     private static byte[] readFileContentFromShare(DiskShare share, String filePath) throws IOException {

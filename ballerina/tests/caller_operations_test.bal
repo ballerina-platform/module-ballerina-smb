@@ -167,6 +167,51 @@ Service copBytesStreamGetService = service object {
     }
 };
 
+int copPutBytesStreamCounter = 0;
+boolean copPutBytesStreamOk = false;
+boolean copPutBytesStreamVerified = false;
+
+Service copPutBytesStreamService = service object {
+    remote function onFile(byte[] content, Caller caller, FileInfo fileInfo) returns error? {
+        copPutBytesStreamCounter += 1;
+        byte[][] chunks = ["Hello ".toBytes(), "SMB ".toBytes(), "Stream".toBytes()];
+        stream<byte[], error?> byteStream = chunks.toStream();
+        Error? r = caller->putBytesAsStream("/cop_put_bytes_stream_test/output.bin", byteStream);
+        copPutBytesStreamOk = r is ();
+        if r is () {
+            byte[]|Error readBack = caller->getBytes("/cop_put_bytes_stream_test/output.bin");
+            if readBack is byte[] {
+                string|error resultStr = string:fromBytes(readBack);
+                copPutBytesStreamVerified = resultStr is string && resultStr == "Hello SMB Stream";
+            }
+        }
+    }
+    function onError(error err) returns error? {
+        io:println("copPutBytesStreamService error: ", err.message());
+    }
+};
+
+int copPutCsvStreamCounter = 0;
+boolean copPutCsvStreamOk = false;
+boolean copPutCsvStreamVerified = false;
+
+Service copPutCsvStreamService = service object {
+    remote function onFile(byte[] content, Caller caller, FileInfo fileInfo) returns error? {
+        copPutCsvStreamCounter += 1;
+        string[][] csvRows = [["id", "name"], ["1", "Alice"], ["2", "Bob"]];
+        stream<string[], error?> csvStream = csvRows.toStream();
+        Error? r = caller->putCsvAsStream("/cop_put_csv_stream_test/output.csv", csvStream);
+        copPutCsvStreamOk = r is ();
+        if r is () {
+            string[][]|Error readBack = caller->getCsv("/cop_put_csv_stream_test/output.csv");
+            copPutCsvStreamVerified = readBack is string[][];
+        }
+    }
+    function onError(error err) returns error? {
+        io:println("copPutCsvStreamService error: ", err.message());
+    }
+};
+
 // ── service: exercises caller->close() ───────────────────────────────────
 Service copCloseCallerService = service object {
     remote function onFile(byte[] content, Caller caller, FileInfo fileInfo) returns error? {
@@ -351,10 +396,64 @@ function testCallerGetBytesAsStream() returns error? {
     test:assertTrue(copGetBytesStreamOk, "caller->getBytesAsStream should succeed");
 }
 
-// ── Test 6: caller->close() ──────────────────────────────────────────────
+// ── Test 6: caller->putBytesAsStream ────────────────────────────────────
 @test:Config {
     groups: ["cop", "caller-ops"],
     dependsOn: [testCallerGetBytesAsStream]
+}
+function testCallerPutBytesAsStream() returns error? {
+    copPutBytesStreamCounter = 0;
+    copPutBytesStreamOk = false;
+    copPutBytesStreamVerified = false;
+
+    _ = check smbClient->mkdir("/cop_put_bytes_stream_test");
+
+    Listener l = check newCopListener();
+    check l.attach(copPutBytesStreamService, "cop_put_bytes_stream_test");
+    check l.'start();
+    runtime:registerListener(l);
+    runtime:sleep(3);
+
+    copPutBytesStreamCounter = 0;
+    check smbClient->putBytes("/cop_put_bytes_stream_test/trigger.bin", "trigger".toBytes());
+    runtime:sleep(6);
+    check l.immediateStop();
+
+    test:assertTrue(copPutBytesStreamCounter >= 1, "putBytesAsStream handler should fire");
+    test:assertTrue(copPutBytesStreamOk, "caller->putBytesAsStream should succeed");
+    test:assertTrue(copPutBytesStreamVerified, "putBytesAsStream content should be verified via getBytes");
+}
+
+@test:Config {
+    groups: ["cop", "caller-ops"],
+    dependsOn: [testCallerPutBytesAsStream]
+}
+function testCallerPutCsvAsStream() returns error? {
+    copPutCsvStreamCounter = 0;
+    copPutCsvStreamOk = false;
+    copPutCsvStreamVerified = false;
+
+    _ = check smbClient->mkdir("/cop_put_csv_stream_test");
+
+    Listener l = check newCopListener();
+    check l.attach(copPutCsvStreamService, "cop_put_csv_stream_test");
+    check l.'start();
+    runtime:registerListener(l);
+    runtime:sleep(3);
+
+    copPutCsvStreamCounter = 0;
+    check smbClient->putBytes("/cop_put_csv_stream_test/trigger.bin", "trigger".toBytes());
+    runtime:sleep(6);
+    check l.immediateStop();
+
+    test:assertTrue(copPutCsvStreamCounter >= 1, "putCsvAsStream handler should fire");
+    test:assertTrue(copPutCsvStreamOk, "caller->putCsvAsStream should succeed");
+    test:assertTrue(copPutCsvStreamVerified, "putCsvAsStream content should be verified via getCsv");
+}
+
+@test:Config {
+    groups: ["cop", "caller-ops"],
+    dependsOn: [testCallerPutCsvAsStream]
 }
 function testCallerCloseMethod() returns error? {
     copCloseHandlerCounter = 0;
