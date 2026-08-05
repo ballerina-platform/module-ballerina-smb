@@ -7,7 +7,7 @@ keywords = ["smb", "file", "network shares"]
 repository = "https://github.com/ballerina-platform/module-ballerina-smb"
 icon = "icon.png"
 license = ["Apache-2.0"]
-distribution = "2201.13.0"
+distribution = "2201.12.0"
 
 [platform.java21]
 graalvmCompatible = true
