@@ -3,4 +3,4 @@ id = "smb-compiler-plugin"
 class = "io.ballerina.lib.smb.plugin.SmbCompilerPlugin"
 
 [[dependency]]
-path = "../compiler-plugin/build/libs/smb-compiler-plugin-2.0.0.jar"
+path = "../compiler-plugin/build/libs/smb-compiler-plugin-2.0.1-SNAPSHOT.jar"
