@@ -46,3 +46,5 @@ Execute the following commands to build an example from the source:
 ## Testing the example
 
 Copy the sample report at `resources/sample-report.json` to `/sales/new` on the SMB share. You can watch the logs to see the file being processed, records appended to `/sales/data/sales_data.csv`, and the file moved to `/sales/processed/`.
+
+Every report is appended to the same data file, so `/sales/data/sales_data.csv` holds bare rows with no header line. `putCsv` writes a header for a record array only when it is not appending.

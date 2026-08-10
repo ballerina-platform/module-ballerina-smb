@@ -4,7 +4,7 @@ This example demonstrates connecting to an SMB server with Kerberos authenticati
 
 ## Prerequisites
 
-- An SMB server reachable on port `445`. This example does not expose a port setting.
+- An SMB server. It is reached on port `445` unless `smbPort` is set.
 - A Kerberos realm that the SMB server trusts, and a principal in the `user@REALM` format.
 - A `krb5.conf` describing that realm, readable by the process running the example.
 
@@ -17,6 +17,7 @@ Update the placeholders in `Config.toml`.
 ```toml
 # Replace with your values
 kerberosHost = "<smb-hostname-or-ip>"
+smbPort = 445
 kerberosUser = "<username>"
 kerberosPassword = "<password>"
 kerberosDomain = "<domain>"

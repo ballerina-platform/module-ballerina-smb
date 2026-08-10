@@ -21,13 +21,14 @@ configurable string kerberosUser = ?;
 configurable string kerberosPassword = ?;
 configurable string kerberosDomain = ?;
 configurable string kerberosHost = ?;
+configurable int smbPort = 445;
 configurable string kerberosPrincipal = ?;
 configurable string kerberosShare = ?;
 configurable string kerberosConfigFile = ?;
 
 smb:Client smbClient = check new ({
     host: kerberosHost,
-    port: 445,
+    port: smbPort,
     auth: {
         credentials: {
             username: kerberosUser,
