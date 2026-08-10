@@ -8,11 +8,14 @@ Create the following directories on the SMB share before running the example. Th
 
 - `/timesheets` - Root directory for timesheet operations
 - `/timesheets/incoming` - Drop location for new timesheet CSV files
-- `/timesheets/processed` - Successfully validated files are moved here
 - `/timesheets/quarantine` - Invalid files are moved here with error details
 - `/timesheets/validated` - Cleaned and validated CSV data is written here
 
-Valid files are moved to `/timesheets/processed` by the `afterProcess` action of the `@smb:FunctionConfig` annotation. Invalid files are moved by the handler itself, because the quarantine file name encodes why validation failed, which a fixed `moveTo` destination cannot express.
+The following is created automatically if it is absent, because a post-processing move creates its destination directory.
+
+- `/timesheets/processed` - Successfully validated files are moved here
+
+Valid files are moved to `/timesheets/processed` by the `afterProcess` action of the `@smb:FunctionConfig` annotation. Invalid files are moved by the handler itself, because the quarantine file name encodes why validation failed, which a fixed `moveTo` destination cannot express. A handler-issued move does not create its destination, which is why `/timesheets/quarantine` has to exist.
 
 ## Configure
 

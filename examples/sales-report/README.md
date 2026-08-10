@@ -8,11 +8,14 @@ Create the following directories on the SMB share before running the example. Th
 
 - `/sales` - Root directory for sales operations
 - `/sales/new` - Directory monitored for incoming JSON sales reports
-- `/sales/processed` - Reports are moved here once the handler completes successfully
 - `/sales/data` - Directory where sales data is persisted
+
+The following are created automatically if they are absent, because a post-processing move creates its destination directory.
+
+- `/sales/processed` - Reports are moved here once the handler completes successfully
 - `/sales/error` - Reports that fail while being processed are moved here
 
-The moves into `/sales/processed` and `/sales/error` are declared with the `@smb:FunctionConfig` annotation on the handler, so the handler itself contains no file-movement code.
+Both moves are declared with the `@smb:FunctionConfig` annotation on the handler, so the handler itself contains no file-movement code.
 
 ## Configure
 
