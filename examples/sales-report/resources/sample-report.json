@@ -1,0 +1,17 @@
+{
+    "storeId": "ST-001",
+    "storeLocation": "Colombo",
+    "saleDate": "2026-08-10",
+    "items": [
+        {
+            "itemId": "IT-100",
+            "quantity": 2,
+            "totalAmount": 250.50
+        },
+        {
+            "itemId": "IT-101",
+            "quantity": 1,
+            "totalAmount": 99.99
+        }
+    ]
+}

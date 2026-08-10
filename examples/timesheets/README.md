@@ -4,7 +4,7 @@ This example validates contractor timesheet CSV files placed on an SMB share. It
 
 ## Prerequisites
 
-You will need to have the following directories added to the SMB share first.
+Create the following directories on the SMB share before running the example. The service does not create them.
 
 - `/timesheets` - Root directory for timesheet operations
 - `/timesheets/incoming` - Drop location for new timesheet CSV files
@@ -12,20 +12,21 @@ You will need to have the following directories added to the SMB share first.
 - `/timesheets/quarantine` - Invalid files are moved here with error details
 - `/timesheets/validated` - Cleaned and validated CSV data is written here
 
+Valid files are moved to `/timesheets/processed` by the `afterProcess` action of the `@smb:FunctionConfig` annotation. Invalid files are moved by the handler itself, because the quarantine file name encodes why validation failed, which a fixed `moveTo` destination cannot express.
+
 ## Configure
 
 Update `Config.toml` with your SMB credentials.
 
 ```toml
 smbHost = "<host>"
-smbPort = "<port>"
+smbPort = 445
 smbShare = "<share>"
 smbUsername = "<user>"
 smbPassword = "<password>"
-smbDomain = "<domain>"
+smbDomain = "WORKGROUP"
 
 expectedRecordCount = 5
-invalidThreshold = 0.05
 ```
 
 ## Running the example
@@ -46,4 +47,6 @@ Execute the following commands to build an example from the source:
 
 ## Testing the example
 
-Place a CSV timesheet file at `/timesheets/incoming` on the SMB share with columns `contractor_id`, `date`, `hours_worked`, `site_code`. You can watch the logs to see the file being validated, cleaned data written to `/timesheets/validated/`, and the original file moved to `/timesheets/processed/` if valid, or `/timesheets/quarantine/` if validation fails.
+Copy the sample timesheet at `resources/sample-timesheet.csv` to `/timesheets/incoming` on the SMB share. You can watch the logs to see the file being validated, cleaned data written to `/timesheets/validated/`, and the original file moved to `/timesheets/processed/`.
+
+To see the quarantine path, drop a CSV that breaks one of the rules, such as a row count other than `expectedRecordCount` or a `contractor_id` outside `CTR-001` to `CTR-005`. The file is moved to `/timesheets/quarantine/` with the failure reason and a timestamp in its name.

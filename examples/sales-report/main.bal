@@ -64,7 +64,16 @@ listener smb:Listener smbListener = check new ({
     path: "/sales/new"
 }
 service "salesReportProcessor" on smbListener {
-    remote function onFileJson(SalesReport content, smb:Caller caller, smb:FileInfo fileInfo) returns error? {
+
+    @smb:FunctionConfig {
+        afterProcess: {
+            moveTo: "/sales/processed"
+        },
+        afterError: {
+            moveTo: "/sales/error"
+        }
+    }
+    remote function onFileJson(SalesReport content, smb:FileInfo fileInfo, smb:Caller caller) returns error? {
         log:printInfo(string `Processing sales report: ${fileInfo.name}`);
         log:printInfo(string `Store: ${content.storeId}, Location: ${content.storeLocation}, Date: ${content.saleDate}`);
 
@@ -80,12 +89,9 @@ service "salesReportProcessor" on smbListener {
             };
 
         // Persist sales records to CSV file
-        string csvPath = "/sales/data/sales_data.json";
-        check caller->putJson(csvPath, salesRecords, smb:APPEND);
+        string csvPath = "/sales/data/sales_data.csv";
+        check caller->putCsv(csvPath, salesRecords, smb:APPEND);
         log:printInfo(string `Added ${salesRecords.length()} sales records to ${csvPath}`);
-        string destinationPath = string `/sales/processed/${fileInfo.name}`;
-        check caller->move(fileInfo.path, destinationPath);
-        log:printInfo(string `File moved to processed: ${fileInfo.name}`);
     }
 
     remote function onError(error err) returns error? {

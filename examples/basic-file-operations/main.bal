@@ -22,11 +22,10 @@ configurable string kerberosPassword = ?;
 configurable string kerberosDomain = ?;
 configurable string kerberosHost = ?;
 configurable string kerberosPrincipal = ?;
-configurable string kerberosKeytab = ?;
 configurable string kerberosShare = ?;
 configurable string kerberosConfigFile = ?;
 
-smb:Client kerberosClient = check new ({
+smb:Client smbClient = check new ({
     host: kerberosHost,
     port: 445,
     auth: {
@@ -44,17 +43,17 @@ smb:Client kerberosClient = check new ({
 });
 
 public function main() returns error? {
-    smb:FileInfo[]|error listResult = kerberosClient->list("/");
+    smb:FileInfo[] listResult = check smbClient->list("/");
     io:println(listResult);
  
     string testFileName = "/kerberos_file.txt";
     string testContent = "Hello from Kerberos authenticated client!";
-    _ = check kerberosClient->putText(testFileName, testContent);
-    boolean existsResult = check kerberosClient->exists(testFileName);
+    check smbClient->putText(testFileName, testContent);
+    boolean existsResult = check smbClient->exists(testFileName);
     if !existsResult {
         io:println("File creation failed.");
         return;
     }
-    string readResult = check kerberosClient->getText(testFileName);
+    string readResult = check smbClient->getText(testFileName);
     io:println(readResult);
 }
