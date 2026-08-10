@@ -1,4 +1,4 @@
-# Sales report processing via an SMB share
+# Process Sales Reports from an SMB Share
 
 This example processes JSON sales reports placed on an SMB share. It listens for JSON sales reports on an SMB share, flattens nested data into row records, appends them to a CSV data file, and moves the processed file to a designated folder.
 

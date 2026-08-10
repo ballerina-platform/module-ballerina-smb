@@ -1,4 +1,4 @@
-# Timesheet validation via an SMB share
+# Validate Contractor Timesheets on an SMB Share
 
 This example validates contractor timesheet CSV files placed on an SMB share. It monitors the incoming directory, validates each CSV against expected counts and thresholds, then moves valid files to the processed directory while writing cleaned data to the validated directory, or quarantines invalid files with detailed error logs.
 
