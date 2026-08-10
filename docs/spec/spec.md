@@ -1,7 +1,7 @@
 # Specification: Ballerina SMB Library
 
-_Owners_: @niveathika @Nuvindu \
-_Reviewers_: @niveathika \
+_Owners_: @Nuvindu \
+_Reviewers_: @Nuvindu \
 _Created_: 2026/08/10 \
 _Updated_: 2026/08/10 \
 _Edition_: Swan Lake
@@ -89,9 +89,21 @@ public type KerberosConfig record {|
 
 Providing neither `credentials` nor `kerberosConfig` authenticates anonymously. When `kerberosConfig` is present, Kerberos is used.
 
+Anonymous authentication is accepted only with the SMB 2 dialects. Because the default `dialects` list starts at SMB 3.1.1, an anonymous connection has to narrow it, and is rejected otherwise.
+
+```ballerina
+smb:Client smbClient = check new ({
+    host: "smb.example.com",
+    share: "public",
+    dialects: [smb:SMB_2_1, smb:SMB_2_0_2]
+});
+```
+
+Signing and encryption are also unavailable to an anonymous connection, and are turned off for it regardless of how they are configured.
+
 ### 2.2 Message Signing and Encryption
 
-`signRequired` requires that every message of the session be signed, and fails the connection when the server will not sign. `encryptData` encrypts the session payload, which requires a dialect of 3.0 or above. Both default to `false`.
+`signRequired` requires that every message of the session be signed, and fails the connection when the server will not sign. `encryptData` encrypts the session payload, which requires a dialect of 3.0 or above. Both default to `false` and apply to a connection opened by the `smb:Client`.
 
 ### 2.3 Dialect Negotiation
 
@@ -130,7 +142,7 @@ public type ClientConfiguration record {|
 |};
 ```
 
-`enableDfs` resolves DFS referrals, so paths that cross namespaces are followed. `bufferSize` is the transfer buffer in bytes and `connectTimeout` is in seconds.
+`enableDfs` resolves DFS referrals, so paths that cross namespaces are followed. `connectTimeout` is in seconds. The size of the transfer buffer is not specified, and `bufferSize` is tracked in [ballerina-library#9022](https://github.com/ballerina-platform/ballerina-library/issues/9022).
 
 Initialization establishes the connection and the tree connect to the share, so an unreachable host, a rejected identity, or a missing share fails at construction rather than on first use.
 
@@ -148,7 +160,7 @@ smb:Client smbClient = check new ({
 
 ### 3.2 Writing Files
 
-Every write takes an `smb:FileWriteOption`, which defaults to `OVERWRITE`.
+Every `put` method takes an `smb:FileWriteOption`, which defaults to `OVERWRITE`.
 
 ```ballerina
 public enum FileWriteOption {
@@ -171,7 +183,7 @@ A write creates the file when it does not exist. It does not create the director
 
 `putCsv` emits a header row derived from the record fields when the content is a `record {}[]` and the option is not `APPEND`. Appending a record array writes data rows only, so a file built entirely by appends carries no header.
 
-`patch` writes a `byte[]` at a given byte offset within an existing file, leaving the surrounding content untouched.
+`patch` writes a `byte[]` at a given byte offset, leaving the surrounding content untouched. It takes no write option, and creates the file when it does not exist.
 
 ### 3.3 Reading Files
 
@@ -202,7 +214,11 @@ SalesReport report = check smbClient->getJson("/sales/latest.json");
 
 Binding fails with an `smb:Error` when the content does not match the target type. `laxDataBinding` relaxes this, allowing content with absent or additional fields to bind.
 
-`csvFailSafe` applies to CSV reads. When present, a record that cannot be bound is skipped and logged instead of failing the whole read. `contentType` selects what is logged for each skipped record.
+`csvFailSafe` applies to `getCsv` and to an `onFileCsv` handler that binds the whole file. When present, a record that cannot be bound is skipped and recorded instead of failing the whole read. `contentType` selects what is written for each skipped record.
+
+Skipped records are appended to `<file-name>_error.log` in the working directory of the Ballerina program, not to the share. Under `RAW` and `RAW_AND_METADATA` that file holds the raw text of the skipped records, so it inherits the sensitivity of the data being read.
+
+Fail-safe handling of a CSV consumed as a stream is not specified, and is tracked in [ballerina-library#9023](https://github.com/ballerina-platform/ballerina-library/issues/9023).
 
 ```ballerina
 public type FailSafeOptions record {|
@@ -238,7 +254,9 @@ public type FileInfo record {|
 |};
 ```
 
-`mkdir` and `rmdir` create and remove directories. `rename` changes the name of an entry within its directory, while `move` relocates it to another path and `copy` duplicates it. `delete` removes a file. `exists`, `size`, and `isDirectory` report on a path.
+`mkdir` and `rmdir` create and remove directories. `copy` duplicates a file and `delete` removes one. `exists`, `size`, and `isDirectory` report on a path.
+
+`rename` and `move` are the same operation: both write the content to the destination path and then remove the source, so either can relocate a file across directories. Neither is atomic, and neither creates the directories leading to the destination.
 
 ## 4. Listener
 
@@ -266,6 +284,8 @@ public type ListenerConfiguration record {|
 ```
 
 `pollingInterval` is the number of seconds between polls, and defaults to 60. The listener polls the watched directory of every attached service on each cycle.
+
+The polling connection negotiates the dialects given in `dialects`. The remaining transport settings of the record are not specified for the listener, and are tracked in [ballerina-library#9021](https://github.com/ballerina-platform/ballerina-library/issues/9021).
 
 ### 4.2 Service
 
@@ -386,21 +406,25 @@ remote function onError(error err) returns error? {
 
 ## 5. Caller
 
-An `smb:Caller` declared as a handler parameter is the share connection the listener already holds, so a handler can act on the share while processing a file without opening a second connection.
+An `smb:Caller` declared as a handler parameter lets a handler act on the share while processing a file.
+
+The caller has its own connection to the share, opened from the listener configuration. It is created once for a listener and shared by every service attached to it, so a listener that has a caller holds two connections: the one it polls with and the one the caller uses.
 
 The `smb:Caller` offers the write, read, and file management operations of the client: `putBytes`, `patch`, `putText`, `putJson`, `putXml`, `putCsv`, `putBytesAsStream`, `putCsvAsStream`, `getBytes`, `getText`, `getJson`, `getXml`, `getCsv`, `getBytesAsStream`, `getCsvAsStream`, `list`, `mkdir`, `rmdir`, `rename`, `move`, `copy`, `exists`, `size`, `isDirectory`, and `delete`.
 
 The read operations of the `smb:Caller` return the plain types rather than binding to a contextually expected type, so `getJson` returns `json` and `getCsv` returns `string[][]`.
 
-The lifetime of the connection belongs to the listener. Calling `close` on an `smb:Caller` closes the connection the listener depends on.
+The lifetime of the caller belongs to the listener, which closes it when it stops. Closing an `smb:Caller` from a handler does not stop the listener, which keeps polling on its own connection, but it does close the connection every service on that listener shares, so subsequent caller operations fail.
 
 ## 6. Errors
 
-The library defines a single distinct error type, and every operation that can fail returns it.
+The library defines a single distinct error type.
 
 ```ballerina
 public type Error distinct error;
 ```
+
+Every client and caller operation that can fail returns an `smb:Error`. The lifecycle methods of the listener, `attach`, `detach`, `gracefulStop`, and `immediateStop`, are declared to return a plain `error?`, because they also propagate errors raised by the task scheduler they use.
 
 An `smb:Error` carries the reason in its message. Failures reported by the server keep the SMB status in the message, so a rejected operation can be told apart from a transport failure.
 
