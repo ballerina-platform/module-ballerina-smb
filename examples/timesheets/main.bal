@@ -61,6 +61,12 @@ listener smb:Listener smbListener = check new ({
     path: "/timesheets/incoming"
 }
 service "timesheetValidator" on smbListener {
+
+    @smb:FunctionConfig {
+        afterProcess: {
+            moveTo: "/timesheets/processed"
+        }
+    }
     remote function onFileCsv(TimesheetRecord[] content, smb:FileInfo fileInfo, smb:Caller caller) returns error? {
         log:printInfo(string `Processing timesheet file: ${fileInfo.name} with ${content.length()} records`);
         
@@ -79,8 +85,10 @@ service "timesheetValidator" on smbListener {
                 quarantineReason = "record_count_mismatch";
             }
             
+            // The quarantine path encodes the failure reason, so the move is done here rather than
+            // through `afterError`. Returning an error also skips the `afterProcess` move.
             check quarantineFile(caller, fileInfo, quarantineReason);
-            return;
+            return error(string `Timesheet validation failed for ${fileInfo.name}: ${quarantineReason}`);
         }
         
         log:printInfo(string `All validations passed for ${fileInfo.name}`);
@@ -93,11 +101,6 @@ service "timesheetValidator" on smbListener {
         }
         check caller->putCsv(validatedPath, csvContent, smb:OVERWRITE);
         log:printInfo(string `Validated ${content.length()} records saved to ${validatedPath}`);
-        
-        // Move original file to processed folder
-        string processedPath = string `/timesheets/processed/${fileInfo.name}`;
-        check caller->move(fileInfo.path, processedPath);
-        log:printInfo(string `Successfully processed file: ${fileInfo.name}`);
     }
 
     remote function onError(error err) returns error? {

@@ -1,0 +1,1 @@
+../Connect to a Kerberos SMB Share and Transfer Files.md
