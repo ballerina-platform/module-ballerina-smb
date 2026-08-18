@@ -370,7 +370,9 @@ public type FunctionConfiguration record {|
 |};
 ```
 
-`afterProcess` applies when the handler succeeds, and `afterError` when processing the file fails. A file whose applicable action is not set stays where it is. At most one action applies to a file.
+`afterProcess` applies when the handler succeeds, and `afterError` when the handler fails. A file whose applicable action is not set stays where it is. At most one action applies to a file.
+
+A file that cannot be read, or whose content cannot be bound to the handler's content parameter, never reaches the handler. It goes to `onError` and stays in the watched directory. `afterError` does not apply to it.
 
 ```ballerina
 public const DELETE = "DELETE";
@@ -395,8 +397,6 @@ remote function onFileJson(SalesReport report, smb:FileInfo fileInfo) returns er
 ```
 
 A handler that moves the file itself and also declares `afterProcess` leaves the listener acting on a path that is no longer there.
-
-> **Implementation note:** `afterError` is currently applied only when the handler body fails. A file whose content cannot be read or bound reaches `onError` without the action being applied, and stays in the watched directory. This differs from the behaviour above, and is tracked in [ballerina-library#9018](https://github.com/ballerina-platform/ballerina-library/issues/9018).
 
 ### 4.7 Error Handling
 
