@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+## [2.0.1] - 2026-08-06
+
+### Changed
+
+- Update the package icon
+
+## [2.0.0] - 2026-08-05
+
 ### Added
 
 - [Add a compiler plugin that validates the remote methods, parameters, and return types of an SMB service](https://github.com/ballerina-platform/ballerina-library/issues/8611)
