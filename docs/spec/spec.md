@@ -181,8 +181,8 @@ check smbClient->close();
 | --- | --- |
 | `putBytes` | `byte[]` |
 | `putText` | `string` |
-| `putJson` | `json` or `record {}` |
-| `putXml` | `xml` or `record {}` |
+| `putJson` | `json` or `record {\|json...;\|}` |
+| `putXml` | `xml` or `record {\|json...;\|}` |
 | `putCsv` | `string[][]` or `record {}[]` |
 | `putBytesAsStream` | `stream<byte[], error?>` |
 | `putCsvAsStream` | `stream<string[]\|record {}, error?>` |
@@ -208,8 +208,8 @@ A write creates the file when it is not there. **It does not create the director
 | --- | --- |
 | `getBytes` | `byte[]` |
 | `getText` | `string` |
-| `getJson` | `json` or `record {}` |
-| `getXml` | `xml` or `record {}` |
+| `getJson` | `json` or `record {\|json...;\|}` |
+| `getXml` | `xml` or `record {\|json...;\|}` |
 | `getCsv` | `string[][]` or `record {}[]` |
 | `getBytesAsStream` | `stream<byte[], error?>` |
 | `getCsvAsStream` | a stream of `string[]` or `record {}` |
@@ -332,8 +332,8 @@ A service declares one or more content handlers. The listener reads the file, bi
 | Handler | Content parameter |
 | --- | --- |
 | `onFileText` | `string` |
-| `onFileJson` | `json` or `record {}` |
-| `onFileXml` | `xml` or `record {}` |
+| `onFileJson` | `json` or `record {\|json...;\|}` |
+| `onFileXml` | `xml` or `record {\|json...;\|}` |
 | `onFileCsv` | `string[][]`, `record {}[]`, or a stream of either |
 | `onFile` | `byte[]`, or a `stream<byte[], error?>` |
 
