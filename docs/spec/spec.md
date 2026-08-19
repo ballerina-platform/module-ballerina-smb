@@ -1,9 +1,9 @@
 # Specification: Ballerina SMB Library
 
-_Owners_: @Nuvindu \
+_Owners_: @Nuvindu @niveathika \
 _Reviewers_: @Nuvindu \
 _Created_: 2026/08/10 \
-_Updated_: 2026/08/18 \
+_Updated_: 2026/08/19 \
 _Edition_: Swan Lake
 
 ## Introduction
@@ -21,6 +21,9 @@ The implementation that matches this specification is released with the distribu
 1. [Overview](#1-overview)
 2. [Security](#2-security)
    * 2.1 [Authentication](#21-authentication)
+     * 2.1.1 [NTLMv2 Authentication](#211-ntlmv2-authentication)
+     * 2.1.2 [Kerberos Authentication](#212-kerberos-authentication)
+     * 2.1.3 [Anonymous Authentication](#213-anonymous-authentication)
    * 2.2 [Message Signing and Encryption](#22-message-signing-and-encryption)
    * 2.3 [Dialect Negotiation](#23-dialect-negotiation)
 3. [Client](#3-client)
@@ -46,11 +49,11 @@ The library has three parts.
 
 | Part | What it does |
 | --- | --- |
-| `smb:Client` | Reads, writes, moves, copies, and lists files on a share |
-| `smb:Listener` | Polls a directory on a share and hands each file that arrives or disappears to a service |
-| `smb:Caller` | A share connection given to a handler, so it can act on the share while processing a file |
+| `smb:Client` | Performs file system operations on an SMB share |
+| `smb:Listener` | Polls a directory on an SMB share and triggers on file changes |
+| `smb:Caller` | Provides SMB share access to an `smb:Service` handler for file operations |
 
-A connection is always to one named share. Every path the library takes or returns is relative to that share, and uses `/` as the separator on every server platform.
+A connection is bound to a single named share. Every path the library takes or returns is relative to that share, and uses `/` as the separator on every server platform.
 
 Dialects SMB 2.0.2 through 3.1.1 are supported. SMB 1.0 is not.
 
@@ -67,6 +70,10 @@ public type AuthConfiguration record {|
 |};
 ```
 
+When both are present, Kerberos is used. When neither is provided, the connection uses anonymous authentication.
+
+#### 2.1.1 NTLMv2 Authentication
+
 `credentials` is an NTLMv2 identity. `domain` defaults to `WORKGROUP`.
 
 ```ballerina
@@ -76,6 +83,8 @@ public type Credentials record {|
     string domain = "WORKGROUP";
 |};
 ```
+
+#### 2.1.2 Kerberos Authentication
 
 `kerberosConfig` is a Kerberos identity. `principal` takes the `user@REALM` form. Without a `keytab`, the ticket is obtained with the password from `credentials`. `configFile` points at a `krb5.conf` describing the realm.
 
@@ -87,7 +96,7 @@ public type KerberosConfig record {|
 |};
 ```
 
-When both are present, Kerberos is used. When neither is present, the connection is anonymous.
+#### 2.1.3 Anonymous Authentication
 
 **An anonymous connection works only with the SMB 2 dialects.** The default `dialects` list starts at SMB 3.1.1, so an anonymous connection must narrow the list itself. It is rejected otherwise.
 
@@ -123,7 +132,9 @@ public enum Dialect {
 
 ### 3.1 Initializing the Client
 
-`share` is the only required field.
+The `smb:Client` is initialized using a `smb:ClientConfiguration` record. The `share` field is the only required field. All other configuration fields are either optional or have default values.
+
+The `host` and `port` identify the SMB server, while `share` specifies the share the client connects to. Authentication, dialect negotiation, signing, encryption, DFS, buffering, and connection timeout can be configured through the other fields.
 
 ```ballerina
 public type ClientConfiguration record {|
@@ -160,14 +171,18 @@ smb:Client smbClient = check new ({
 
 `close` releases the connection.
 
+```ballerina
+check smbClient->close();
+```
+
 ### 3.2 Writing Files
 
 | Method | Content |
 | --- | --- |
 | `putBytes` | `byte[]` |
 | `putText` | `string` |
-| `putJson` | `json` |
-| `putXml` | `xml`, or a record convertible to XML |
+| `putJson` | `json` or `record {}` |
+| `putXml` | `xml` or `record {}` |
 | `putCsv` | `string[][]` or `record {}[]` |
 | `putBytesAsStream` | `stream<byte[], error?>` |
 | `putCsvAsStream` | `stream<string[]\|record {}, error?>` |
@@ -183,7 +198,7 @@ public enum FileWriteOption {
 
 A write creates the file when it is not there. **It does not create the directories above it.** Writing to a path whose parent directory is absent fails; call `mkdir` first.
 
-`putCsv` writes a header row taken from the record fields when the content is a `record {}[]` and the option is not `APPEND`. Appending a record array writes data rows only, so a file built entirely by appends has no header.
+`putCsv` writes a header row taken from the record fields when the content is a `record {}[]` and the option is not `APPEND`. Appending a `record {}[]` writes data rows only, so a file built entirely by appends has no header.
 
 `patch` writes a `byte[]` at a byte offset and leaves the rest of the file alone. It takes no write option, and creates the file when it is not there.
 
@@ -193,11 +208,11 @@ A write creates the file when it is not there. **It does not create the director
 | --- | --- |
 | `getBytes` | `byte[]` |
 | `getText` | `string` |
-| `getJson` | the `json` type expected at the call site |
-| `getXml` | `xml`, or the record type expected at the call site |
-| `getCsv` | `string[][]`, or the `record {}[]` type expected at the call site |
+| `getJson` | `json` or `record {}` |
+| `getXml` | `xml` or `record {}` |
+| `getCsv` | `string[][]` or `record {}[]` |
 | `getBytesAsStream` | `stream<byte[], error?>` |
-| `getCsvAsStream` | a stream of `string[]`, or of the record type expected at the call site |
+| `getCsvAsStream` | a stream of `string[]` or `record {}` |
 
 A streaming read holds the file open until the stream is consumed or closed, so always close it.
 
@@ -317,9 +332,9 @@ A service declares one or more content handlers. The listener reads the file, bi
 | Handler | Content parameter |
 | --- | --- |
 | `onFileText` | `string` |
-| `onFileJson` | `json`, or a record type the JSON content binds to |
-| `onFileXml` | `xml`, or a record type |
-| `onFileCsv` | `string[][]`, a record array type, or a stream of either |
+| `onFileJson` | `json` or `record {}` |
+| `onFileXml` | `xml` or `record {}` |
+| `onFileCsv` | `string[][]`, `record {}[]`, or a stream of either |
 | `onFile` | `byte[]`, or a `stream<byte[], error?>` |
 
 Declaring a stream as the content parameter of `onFileCsv` or `onFile` streams the file instead of holding it in memory.
