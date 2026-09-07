@@ -55,7 +55,7 @@ modules = [
 [[package]]
 org = "ballerina"
 name = "io"
-version = "1.8.1"
+version = "1.8.2"
 dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "lang.value"}
@@ -160,7 +160,7 @@ dependencies = [
 [[package]]
 org = "ballerina"
 name = "smb"
-version = "2.0.1"
+version = "2.0.2"
 dependencies = [
 	{org = "ballerina", name = "data.csv"},
 	{org = "ballerina", name = "data.jsondata"},
