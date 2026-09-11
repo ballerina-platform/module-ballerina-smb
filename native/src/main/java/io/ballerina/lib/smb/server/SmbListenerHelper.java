@@ -322,9 +322,10 @@ public class SmbListenerHelper {
     }
 
     public static Object poll(Environment env, BObject listenerEndpoint) {
-        return env.yieldAndRun(() -> {
-            String listenerUrl = (String) listenerEndpoint.getNativeData(LISTENER_REMOTE_URL);
-            String listenerProtocol = (String) listenerEndpoint.getNativeData(LISTENER_PROTOCOL);
+        String listenerUrl = (String) listenerEndpoint.getNativeData(LISTENER_REMOTE_URL);
+        String listenerProtocol = (String) listenerEndpoint.getNativeData(LISTENER_PROTOCOL);
+        SmbTracingUtil.sendPollMetricsData(env, listenerUrl, listenerProtocol);
+        Object result = env.yieldAndRun(() -> {
             // Declared out here so the catch can hand the caller to onError, but read inside the try so a
             // failing lookup still becomes a polling error rather than escaping as a panic.
             ListenerContext listenerContext = null;
@@ -343,12 +344,20 @@ public class SmbListenerHelper {
                 return SmbUtil.createError(POLLING_ERROR + e.getMessage(), SMB_ERROR);
             }
         });
+        if (result instanceof BError) {
+            SmbTracingUtil.sendPollOutcome(env, SmbMetricsUtil.OUTCOME_FAILURE);
+        } else {
+            SmbTracingUtil.sendPollOutcome(env, SmbMetricsUtil.OUTCOME_SUCCESS);
+        }
+        return result;
     }
 
     private static ListenerContext readListenerContext(BObject listenerEndpoint) {
         return new ListenerContext(
                 (BMap<BString, Object>) listenerEndpoint.getNativeData(SMB_SERVICE_ENDPOINT_CONFIG),
-                (BObject) listenerEndpoint.getNativeData(LISTENER_CALLER));
+                (BObject) listenerEndpoint.getNativeData(LISTENER_CALLER),
+                (String) listenerEndpoint.getNativeData(LISTENER_REMOTE_URL),
+                (String) listenerEndpoint.getNativeData(LISTENER_PROTOCOL));
     }
 
     public static Object cleanup(BObject listenerEndpoint) throws Exception {
@@ -1184,8 +1193,13 @@ public class SmbListenerHelper {
         List<Object> args = new ArrayList<>();
         args.add(bError);
         appendCallerIfDeclared(args, handler, listenerContext);
+        String errorType = bError.getType() != null ? bError.getType().getName() : SmbMetricsUtil.UNKNOWN;
+        String url = listenerContext != null ? listenerContext.url() : null;
+        String protocol = listenerContext != null ? listenerContext.protocol() : null;
+        Map<String, Object> strandProperties = SmbTracingUtil.createErrorStrandProperties(
+                SmbMetricsUtil.CONTEXT_LISTENER, url, protocol, null, errorType);
         Object result = env.getRuntime().callMethod(context.service(), ON_ERROR_METHOD,
-                new StrandMetadata(handler.isConcurrentSafe(), null), args.toArray());
+                new StrandMetadata(handler.isConcurrentSafe(), strandProperties), args.toArray());
         if (result instanceof BError resultError) {
             log.debug("onError returned an error: {}", resultError.getErrorMessage().getValue());
         }

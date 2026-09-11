@@ -211,42 +211,6 @@ public class SmbTracingUtil {
     }
 
     /**
-     * Creates strand properties for a cleanup (post-processing) span.
-     *
-     * @param context       context tag
-     * @param url           host:port
-     * @param protocol      protocol string
-     * @param cleanupAction cleanup action type (move, delete)
-     * @param handlerName   handler method name that triggered this cleanup
-     * @return properties map, or {@code null} if observability is disabled
-     */
-    public static Map<String, Object> createCleanupStrandProperties(String context, String url, String protocol,
-                                                                     String cleanupAction, String handlerName) {
-        if (!ObserveUtils.isObservabilityEnabled()) {
-            return null;
-        }
-        try {
-            SmbObserverContext observerContext = new SmbObserverContext(context, url, protocol);
-            observerContext.addTag(SmbObserverContext.TAG_ACTION_TYPE, SmbMetricsUtil.ACTION_TYPE_EVENT);
-            String instanceUrl = SmbMetricsUtil.getInstanceUrl();
-            if (instanceUrl != null) {
-                observerContext.addTag(SmbObserverContext.TAG_INSTANCE_URL, instanceUrl);
-            }
-            observerContext.addTag(SmbObserverContext.TAG_FILE_STAGE, SmbMetricsUtil.FILE_STAGE_CLEANED_UP);
-            observerContext.addTag(SmbObserverContext.TAG_CLEANUP_ACTION, cleanupAction);
-            if (handlerName != null) {
-                observerContext.addTag(SmbObserverContext.TAG_HANDLER_NAME, handlerName);
-            }
-            Map<String, Object> properties = new HashMap<>();
-            properties.put(ObservabilityConstants.KEY_OBSERVER_CONTEXT, observerContext);
-            return properties;
-        } catch (Throwable t) {
-            log.debug("Failed to create cleanup strand properties", t);
-            return null;
-        }
-    }
-
-    /**
      * Creates strand properties for a listener error dispatch.
      *
      * @param context   context tag
