@@ -1,16 +1,14 @@
 ## Overview
 
-This module provides an SMB client and an SMB listener for working with files on remote SMB (Server Message Block) file shares — the protocol behind Windows file servers, NAS appliances, and Samba.
+This module provides an SMB client and an SMB listener for working with files on remote SMB (Server Message Block) file shares — the protocol behind Windows file servers, NAS appliances, and Samba. The client connects to a share to read, write, move, copy, and list files. The listener polls a directory on a share and dispatches each added or deleted file to a service, handing the service a caller it can use to act on the share while processing a file.
 
-The module supports SMB dialects `2.0.2` through `3.1.1`, NTLMv2 and Kerberos authentication, message signing, and data encryption.
+The module supports SMB dialects `2.0.2` through `3.1.1`, NTLMv2 and Kerberos authentication, message signing, and data encryption. All paths are relative to the configured share.
 
-| Component | Purpose |
-| --- | --- |
-| `smb:Client` | Connect to a share and read, write, move, copy, and list files. |
-| `smb:Listener` | Poll a directory on a share and dispatch each added or deleted file to a service. |
-| `smb:Caller` | The share connection made available to a service, so a handler can act on the share while processing a file. |
+### Key Features
 
-All paths are relative to the configured share.
+- Connect to a share and reading, writing, moving, copying, and listing files
+- Poll a directory and dispatching added or deleted files to a service
+- Support for SMB dialects `2.0.2`–`3.1.1`, NTLMv2/Kerberos authentication, message signing, and encryption
 
 ## Quickstart
 
