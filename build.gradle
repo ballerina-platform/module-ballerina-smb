@@ -106,6 +106,6 @@ release {
     }
 }
 
-task build {
+tasks.named('build') {
     dependsOn('smb-ballerina:build')
 }
