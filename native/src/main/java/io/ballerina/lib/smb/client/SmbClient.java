@@ -38,6 +38,8 @@ import com.hierynomus.smbj.share.File;
 import io.ballerina.lib.smb.iterator.ByteIterator;
 import io.ballerina.lib.smb.iterator.CsvIterator;
 import io.ballerina.lib.smb.iterator.IteratorToInputStream;
+import io.ballerina.lib.smb.observability.SmbMetricsUtil;
+import io.ballerina.lib.smb.observability.SmbTracingUtil;
 import io.ballerina.lib.smb.util.CSVUtils;
 import io.ballerina.lib.smb.util.ModuleUtils;
 import io.ballerina.lib.smb.util.SmbContentConverter;
@@ -53,6 +55,7 @@ import io.ballerina.runtime.api.types.TypeTags;
 import io.ballerina.runtime.api.utils.StringUtils;
 import io.ballerina.runtime.api.values.BArray;
 import io.ballerina.runtime.api.values.BDecimal;
+import io.ballerina.runtime.api.values.BError;
 import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BObject;
 import io.ballerina.runtime.api.values.BStream;
@@ -133,6 +136,8 @@ public class SmbClient {
     private static final String CLIENT_CLOSED_ERROR_MESSAGE =
             "SMB Client is already closed, hence further operations are not allowed";
     private static final String ON_CLOSE_ERROR = "Error occurred while closing the SMB client: ";
+    private static final String REMOTE_URL = "remoteUrl";
+    private static final String PROTOCOL = "smbProtocol";
     public static final String MISSING_CREDENTIALS_FOR_AUTH_ERROR =
             "Credentials must be provided for the specified auth configuration";
     public static final String MISSING_CREDENTIALS_FOR_KERBEROS_ERROR =
@@ -175,6 +180,28 @@ public class SmbClient {
     public static final String COPY_FILE_ERROR = "Failed to copy file: ";
 
     private SmbClient() {
+    }
+
+    private static String getRemoteUrl(BObject clientConnector) {
+        return (String) clientConnector.getNativeData(REMOTE_URL);
+    }
+
+    private static String getProtocol(BObject clientConnector) {
+        return (String) clientConnector.getNativeData(PROTOCOL);
+    }
+
+    private static Object sendTraces(Object result, Environment env, BObject clientConnector) {
+        if (result instanceof BError bError) {
+            String errorType = bError.getType() != null ? bError.getType().getName() : SmbMetricsUtil.UNKNOWN;
+            SmbTracingUtil.sendErrorMetricsOnCurrentFrame(env, errorType);
+        } else {
+            io.ballerina.runtime.observability.ObserverContext ctx =
+                    io.ballerina.runtime.observability.ObserveUtils.getObserverContextOfCurrentFrame(env);
+            if (ctx != null) {
+                ctx.addTag("outcome", SmbMetricsUtil.OUTCOME_SUCCESS);
+            }
+        }
+        return result;
     }
 
     public static Object initClientEndpoint(BObject clientEndpoint, BMap<Object, Object> config) {
@@ -262,6 +289,10 @@ public class SmbClient {
             clientEndpoint.addNativeData(SMB_SESSION, session);
             clientEndpoint.addNativeData(SMB_SHARE, diskShare);
 
+            String hostPort = port > 0 ? host + ":" + port : host;
+            clientEndpoint.addNativeData(REMOTE_URL, hostPort);
+            clientEndpoint.addNativeData(PROTOCOL, "smb");
+
             log.debug("SMB client initialized successfully for host: {} share: {}", host, share);
             return null;
         } catch (Exception exception) {
@@ -270,7 +301,9 @@ public class SmbClient {
     }
 
     public static Object mkdir(Environment env, BObject clientEndpoint, BString directoryPath) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_MANAGE, directoryPath.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 DiskShare share = retrieveShare(clientEndpoint);
                 share.mkdir(directoryPath.getValue());
@@ -279,10 +312,13 @@ public class SmbClient {
                 return SmbUtil.createError(DIRECTORY_CREATE_ERROR + exception.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
     public static Object list(Environment env, BObject clientEndpoint, BString directoryPath) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_MANAGE, directoryPath.getValue());
+        return sendTraces(env.yieldAndRun(() -> {
             try {
                 DiskShare share = retrieveShare(clientEndpoint);
                 List<FileIdBothDirectoryInformation> files = share.list(directoryPath.getValue());
@@ -340,7 +376,7 @@ public class SmbClient {
             } catch (Exception e) {
                 return SmbUtil.createError("Failed to list directory: " + e.getMessage(), SMB_ERROR);
             }
-        });
+        }), env, clientEndpoint);
     }
 
     public static SMB2Dialect mapDialect(String dialectStr) {
@@ -364,58 +400,87 @@ public class SmbClient {
     }
 
     public static Object getBytes(Environment env, BObject clientEndpoint, BString filePath) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_GET, filePath.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 byte[] getBytesResult = readFileAsBytes(clientEndpoint, filePath.getValue());
+                SmbMetricsUtil.reportBytesTransferred(getRemoteUrl(clientEndpoint),
+                        getProtocol(clientEndpoint), SmbMetricsUtil.CONTEXT_CLIENT,
+                        SmbMetricsUtil.OPERATION_TYPE_GET, getBytesResult.length);
                 return ValueCreator.createArrayValue(getBytesResult);
             } catch (Exception e) {
                 return SmbUtil.createError("Failed to read file: " + e.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
     public static Object getText(Environment env, BObject clientEndpoint, BString filePath) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_GET, filePath.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 byte[] bytes = readFileAsBytes(clientEndpoint, filePath.getValue());
+                SmbMetricsUtil.reportBytesTransferred(getRemoteUrl(clientEndpoint),
+                        getProtocol(clientEndpoint), SmbMetricsUtil.CONTEXT_CLIENT,
+                        SmbMetricsUtil.OPERATION_TYPE_GET, bytes.length);
                 return StringUtils.fromString(new String(bytes, StandardCharsets.UTF_8));
             } catch (Exception e) {
                 return SmbUtil.createError("Failed to read file as text: " + e.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
     public static Object getJson(Environment env, BObject clientEndpoint, BString filePath,
                                   io.ballerina.runtime.api.values.BTypedesc typeDesc) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_GET, filePath.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 byte[] bytes = readFileAsBytes(clientEndpoint, filePath.getValue());
+                SmbMetricsUtil.reportBytesTransferred(getRemoteUrl(clientEndpoint),
+                        getProtocol(clientEndpoint), SmbMetricsUtil.CONTEXT_CLIENT,
+                        SmbMetricsUtil.OPERATION_TYPE_GET, bytes.length);
                 boolean laxDataBinding = (boolean) clientEndpoint.getNativeData(ENDPOINT_CONFIG_LAX_DATA_BINDING);
                 return SmbContentConverter.convertBytesToJson(bytes, typeDesc.getDescribingType(), laxDataBinding);
             } catch (Exception e) {
                 return SmbUtil.createError("Failed to read file as JSON: " + e.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
     public static Object getXml(Environment env, BObject clientEndpoint, BString filePath,
                                  io.ballerina.runtime.api.values.BTypedesc typeDesc) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_GET, filePath.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 byte[] bytes = readFileAsBytes(clientEndpoint, filePath.getValue());
+                SmbMetricsUtil.reportBytesTransferred(getRemoteUrl(clientEndpoint),
+                        getProtocol(clientEndpoint), SmbMetricsUtil.CONTEXT_CLIENT,
+                        SmbMetricsUtil.OPERATION_TYPE_GET, bytes.length);
                 boolean laxDataBinding = (boolean) clientEndpoint.getNativeData(ENDPOINT_CONFIG_LAX_DATA_BINDING);
                 return SmbContentConverter.convertBytesToXml(bytes, typeDesc.getDescribingType(), laxDataBinding);
             } catch (Exception e) {
                 return SmbUtil.createError("Failed to read file as XML: " + e.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
     public static Object getCsv(Environment env, BObject clientEndpoint, BString filePath,
                                  io.ballerina.runtime.api.values.BTypedesc typeDesc) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_GET, filePath.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 byte[] bytes = readFileAsBytes(clientEndpoint, filePath.getValue());
+                SmbMetricsUtil.reportBytesTransferred(getRemoteUrl(clientEndpoint),
+                        getProtocol(clientEndpoint), SmbMetricsUtil.CONTEXT_CLIENT,
+                        SmbMetricsUtil.OPERATION_TYPE_GET, bytes.length);
                 boolean laxDataBinding = (boolean) clientEndpoint.getNativeData(ENDPOINT_CONFIG_LAX_DATA_BINDING);
                 BMap<?, ?> csvFailSafe = (BMap<?, ?>) clientEndpoint.getNativeData(ENDPOINT_CONFIG_CSV_FAIL_SAFE);
                 String fileNamePrefix = SmbContentConverter.deriveFileNamePrefix(filePath);
@@ -425,10 +490,13 @@ public class SmbClient {
                 return SmbUtil.createError("Failed to read file as CSV: " + e.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
     public static Object getBytesAsStream(Environment env, BObject clientEndpoint, BString filePath) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_GET, filePath.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 SMBClient smbClient = (SMBClient) clientEndpoint.getNativeData(SMB_CLIENT_CONNECTOR);
                 if (smbClient == null) {
@@ -442,11 +510,14 @@ public class SmbClient {
                 return SmbUtil.createError("Failed to read file as byte stream: " + e.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
     public static Object getCsvAsStream(Environment env, BObject clientEndpoint, BString filePath,
                                         BTypedesc typeDesc) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_GET, filePath.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 SMBClient smbClient = (SMBClient) clientEndpoint.getNativeData(SMB_CLIENT_CONNECTOR);
                 if (smbClient == null) {
@@ -460,6 +531,7 @@ public class SmbClient {
                 return SmbUtil.createError("Failed to read file as CSV stream: " + e.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
     private static InputStream getFileInputStream(BObject clientEndpoint, String filePath) throws IOException {
@@ -494,9 +566,14 @@ public class SmbClient {
 
     public static Object putBytes(Environment env, BObject clientEndpoint, BString filePath,
                                    BArray content, BString option) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_PUT, filePath.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 byte[] bytes = content.getBytes();
+                SmbMetricsUtil.reportBytesTransferred(getRemoteUrl(clientEndpoint),
+                        getProtocol(clientEndpoint), SmbMetricsUtil.CONTEXT_CLIENT,
+                        SmbMetricsUtil.OPERATION_TYPE_PUT, bytes.length);
                 boolean append = WRITE_OPTION_APPEND.equals(option.getValue());
                 writeFileBytes(clientEndpoint, filePath.getValue(), bytes, append);
                 return null;
@@ -504,6 +581,7 @@ public class SmbClient {
                 return SmbUtil.createError(WRITE_FILE_ERROR + e.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
     public static Object patch(Environment env, BObject clientEndpoint, BString filePath,
@@ -532,9 +610,14 @@ public class SmbClient {
 
     public static Object putText(Environment env, BObject clientEndpoint, BString filePath,
                                   BString content, BString option) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_PUT, filePath.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 byte[] bytes = content.getValue().getBytes(StandardCharsets.UTF_8);
+                SmbMetricsUtil.reportBytesTransferred(getRemoteUrl(clientEndpoint),
+                        getProtocol(clientEndpoint), SmbMetricsUtil.CONTEXT_CLIENT,
+                        SmbMetricsUtil.OPERATION_TYPE_PUT, bytes.length);
                 boolean append = WRITE_OPTION_APPEND.equals(option.getValue());
                 writeFileBytes(clientEndpoint, filePath.getValue(), bytes, append);
                 return null;
@@ -542,10 +625,13 @@ public class SmbClient {
                 return SmbUtil.createError(WRITE_FILE_ERROR + e.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
     public static Object delete(Environment env, BObject clientEndpoint, BString filePath) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_MANAGE, filePath.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 DiskShare share = retrieveShare(clientEndpoint);
                 share.rm(filePath.getValue());
@@ -554,6 +640,7 @@ public class SmbClient {
                 return SmbUtil.createError(DELETE_FILE_ERROR + e.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
     public static Object close(BObject clientEndpoint) {
@@ -817,7 +904,9 @@ public class SmbClient {
     }
 
     public static Object rmdir(Environment env, BObject clientEndpoint, BString directoryPath) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_MANAGE, directoryPath.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 DiskShare share = retrieveShare(clientEndpoint);
                 share.rmdir(directoryPath.getValue(), true);
@@ -826,10 +915,14 @@ public class SmbClient {
                 return SmbUtil.createError(REMOVE_DIRECTORY_ERROR + e.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
     public static Object rename(Environment env, BObject clientEndpoint, BString origin, BString destination) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_MANAGE,
+                origin.getValue(), destination.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 DiskShare share = retrieveShare(clientEndpoint);
                 byte[] content = readFileContentFromShare(share, origin.getValue());
@@ -840,6 +933,7 @@ public class SmbClient {
                 return SmbUtil.createError(RENAME_FILE_ERROR + e.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
     public static Object move(Environment env, BObject clientEndpoint, BString sourcePath, BString destinationPath) {
@@ -847,7 +941,10 @@ public class SmbClient {
     }
 
     public static Object copy(Environment env, BObject clientEndpoint, BString sourcePath, BString destinationPath) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_MANAGE,
+                sourcePath.getValue(), destinationPath.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 DiskShare share = retrieveShare(clientEndpoint);
                 byte[] content = readFileContentFromShare(share, sourcePath.getValue());
@@ -857,10 +954,13 @@ public class SmbClient {
                 return SmbUtil.createError(COPY_FILE_ERROR + e.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
     public static Object exists(Environment env, BObject clientEndpoint, BString path) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_MANAGE, path.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 DiskShare share = retrieveShare(clientEndpoint);
                 return share.fileExists(path.getValue()) || share.folderExists(path.getValue());
@@ -868,10 +968,13 @@ public class SmbClient {
                 return SmbUtil.createError(FILE_EXISTENCE_ERROR + e.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
     public static Object size(Environment env, BObject clientEndpoint, BString filePath) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_MANAGE, filePath.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 DiskShare share = retrieveShare(clientEndpoint);
                 FileAllInformation fileInfo = share.getFileInformation(filePath.getValue());
@@ -880,10 +983,13 @@ public class SmbClient {
                 return SmbUtil.createError(GET_FILE_SIZE_ERROR + e.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
     public static Object isDirectory(Environment env, BObject clientEndpoint, BString path) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_MANAGE, path.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 DiskShare share = retrieveShare(clientEndpoint);
                 return share.folderExists(path.getValue());
@@ -891,18 +997,24 @@ public class SmbClient {
                 return SmbUtil.createError(IS_DIRECTORY_ERROR + e.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
-    public static Object putJson(Environment env, BObject clientEndpoint, BString filePath, 
+    public static Object putJson(Environment env, BObject clientEndpoint, BString filePath,
                                  BString content, BString option) {
         return putText(env, clientEndpoint, filePath, content, option);
     }
 
     public static Object putXml(Environment env, BObject clientEndpoint, BString filePath,
                                  BString content, BString option) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_PUT, filePath.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 byte[] bytes = content.getValue().getBytes(StandardCharsets.UTF_8);
+                SmbMetricsUtil.reportBytesTransferred(getRemoteUrl(clientEndpoint),
+                        getProtocol(clientEndpoint), SmbMetricsUtil.CONTEXT_CLIENT,
+                        SmbMetricsUtil.OPERATION_TYPE_PUT, bytes.length);
                 boolean append = WRITE_OPTION_APPEND.equals(option.getValue());
                 writeFileBytes(clientEndpoint, filePath.getValue(), bytes, append);
                 return null;
@@ -910,15 +1022,21 @@ public class SmbClient {
                 return SmbUtil.createError(WRITE_XML_FILE_ERROR + e.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
     public static Object putCsv(Environment env, BObject clientEndpoint, BString filePath,
                                  BArray content, BString option) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_PUT, filePath.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 boolean addHeader = !option.getValue().equals(WRITE_OPTION_APPEND);
                 String convertToCsv = CSVUtils.convertToCsv(content, addHeader);
                 byte[] bytes = convertToCsv.getBytes(StandardCharsets.UTF_8);
+                SmbMetricsUtil.reportBytesTransferred(getRemoteUrl(clientEndpoint),
+                        getProtocol(clientEndpoint), SmbMetricsUtil.CONTEXT_CLIENT,
+                        SmbMetricsUtil.OPERATION_TYPE_PUT, bytes.length);
                 boolean append = WRITE_OPTION_APPEND.equals(option.getValue());
                 writeFileBytes(clientEndpoint, filePath.getValue(), bytes, append);
                 return null;
@@ -926,11 +1044,14 @@ public class SmbClient {
                 return SmbUtil.createError(WRITE_CSV_FILE_ERROR + e.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
     public static Object putBytesAsStream(Environment env, BObject clientEndpoint, BString filePath,
                                            BStream inputContent, BString option) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_PUT, filePath.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 InputStream stream = createInputStreamFromIterator(env, inputContent.getIteratorObj());
                 boolean append = WRITE_OPTION_APPEND.equals(option.getValue());
@@ -940,11 +1061,14 @@ public class SmbClient {
                 return SmbUtil.createError(WRITE_FILE_ERROR + e.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
     public static Object putCsvAsStream(Environment env, BObject clientEndpoint, BString filePath,
                                          BStream inputContent, BString option) {
-        return env.yieldAndRun(() -> {
+        SmbTracingUtil.sendMetricsData(env, getRemoteUrl(clientEndpoint),
+                getProtocol(clientEndpoint), SmbMetricsUtil.OPERATION_TYPE_PUT, filePath.getValue());
+        Object result = env.yieldAndRun(() -> {
             try {
                 boolean append = WRITE_OPTION_APPEND.equals(option.getValue());
                 boolean addHeader = !append;
@@ -955,6 +1079,7 @@ public class SmbClient {
                 return SmbUtil.createError(WRITE_CSV_FILE_ERROR + e.getMessage(), SMB_ERROR);
             }
         });
+        return sendTraces(result, env, clientEndpoint);
     }
 
     private static InputStream createInputStreamFromIterator(Environment environment, BObject iterator) {

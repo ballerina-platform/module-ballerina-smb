@@ -1504,3 +1504,49 @@ function testOnFileDeleteWithCaller() returns error? {
         io:println("Failed to clean up /delete_tests directory: ", cleanupResult.message());
     }
 }
+
+int noMatchJsonCounter = 0;
+
+Service jsonOnlyService = service object {
+    remote function onFileJson(json content, FileInfo fileInfo) returns error? {
+        noMatchJsonCounter += 1;
+    }
+
+    function onError(error err) returns error? {
+        io:println("JSON-only service error: ", err.message());
+    }
+};
+
+@test:Config {
+    groups: ["listener", "no-handler-match"]
+}
+function testNoHandlerMatched() returns error? {
+    noMatchJsonCounter = 0;
+
+    check smbClient->mkdir("no_match_tests");
+
+    Listener noMatchListener = check new ({
+        host: "localhost",
+        port: 445,
+        auth: {
+            credentials: {
+                username: "testuser",
+                password: "testpass"
+            }
+        },
+        share: "testshare",
+        pollingInterval: 2,
+        bufferSize: 65536
+    });
+
+    check noMatchListener.attach(jsonOnlyService, "no_match_tests");
+    check noMatchListener.'start();
+    runtime:registerListener(noMatchListener);
+
+    check smbClient->putBytes("/no_match_tests/unhandled_file.dat", "some binary data".toBytes());
+
+    runtime:sleep(5);
+    check noMatchListener.immediateStop();
+
+    test:assertEquals(noMatchJsonCounter, 0, "JSON handler should not be triggered for .dat file");
+}
