@@ -62,7 +62,7 @@ compileJava {
 
 jacoco {
     toolVersion = "${jacocoVersion}"
-    reportsDirectory = file("$buildDir/reports/jacoco")
+    reportsDirectory = layout.buildDirectory.dir("reports/jacoco")
 }
 
 jacocoTestReport {
