@@ -47,6 +47,7 @@ path = "./lib/mbassador-@mbassador.version@.jar"
 groupId = "org.slf4j"
 artifactId = "slf4j-api"
 version = "@slf4j.version@"
+scope="testOnly"
 path = "./lib/slf4j-api-@slf4j.version@.jar"
 
 [[platform.java21.dependency]]
