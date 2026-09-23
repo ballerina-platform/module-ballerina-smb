@@ -1,7 +1,7 @@
 [package]
 org = "ballerina"
 name = "smb"
-version = "2.0.2"
+version = "2.0.3"
 authors = ["Ballerina"]
 keywords = ["smb", "file", "network shares", "Type/Connector", "Type/Trigger", "Area/Storage & File Management", "Name/SMB"]
 repository = "https://github.com/ballerina-platform/module-ballerina-smb"
@@ -73,8 +73,8 @@ path = "./lib/commons-vfs2-2.10.0.jar"
 [[platform.java21.dependency]]
 groupId = "io.ballerina.lib"
 artifactId = "smb-native"
-version = "2.0.2"
-path = "../native/build/libs/smb-native-2.0.2-SNAPSHOT.jar"
+version = "2.0.3"
+path = "../native/build/libs/smb-native-2.0.3-SNAPSHOT.jar"
 
 [[platform.java21.dependency]]
 groupId = "io.ballerina.lib"
