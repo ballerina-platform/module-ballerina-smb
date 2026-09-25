@@ -32,4 +32,5 @@ module io.ballerina.lib.smb {
     exports io.ballerina.lib.smb.server;
     exports io.ballerina.lib.smb.util;
     exports io.ballerina.lib.smb.iterator;
+    exports io.ballerina.lib.smb.observability;
 }
