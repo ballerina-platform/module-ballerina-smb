@@ -175,7 +175,7 @@ function testClientEmptyDialects() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -199,7 +199,7 @@ function testGetBytesAsStreamAfterClose() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare"
@@ -227,7 +227,7 @@ function testGetCsvAsStreamAfterClose() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare"
@@ -287,7 +287,7 @@ function testCsvStreamHeaderOnlyFile() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",

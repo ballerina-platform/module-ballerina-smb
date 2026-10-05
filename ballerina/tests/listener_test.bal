@@ -23,8 +23,13 @@ const string TEST_HOST = "localhost";
 const int TEST_PORT = 445;
 const string TEST_SHARE = "testshare";
 const string TEST_USERNAME = "testuser";
-const string TEST_PASSWORD = "testpass";
-const string TEST_KERBEROS_PASSWORD = "kerbpass";
+function getTestPassword() returns string {
+    return "testpass";
+}
+
+function getTestKerberosPassword() returns string {
+    return "kerbpass";
+}
 
 int createCounter = 0;
 int deleteCounter = 0;
@@ -57,7 +62,7 @@ listener Listener smbListener = check new ({
     auth: {
         credentials: {
             username: TEST_USERNAME,
-            password: TEST_PASSWORD
+            password: getTestPassword()
         }
     },
     share: "testshare",
@@ -71,7 +76,7 @@ listener Listener testListener = check new ({
     auth: {
         credentials: {
             username: TEST_USERNAME,
-            password: TEST_PASSWORD
+            password: getTestPassword()
         }
     },
     share: "testshare",
@@ -85,7 +90,7 @@ listener Listener stopListener = check new ({
     auth: {
         credentials: {
             username: TEST_USERNAME,
-            password: TEST_PASSWORD
+            password: getTestPassword()
         }
     },
     share: "testshare",
@@ -229,7 +234,7 @@ function testSmbListenerOnError() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -552,7 +557,7 @@ function testOnFileTextHandler() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -596,7 +601,7 @@ function testOnFileJsonHandler() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -638,7 +643,7 @@ function testOnFileXmlHandler() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -681,7 +686,7 @@ function testOnFileCsvHandler() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -732,7 +737,7 @@ function testOnFileCsvRecordArrayHandler() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -784,7 +789,7 @@ function testOnFileCsvStringStreamHandler() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -829,7 +834,7 @@ function testOnFileCsvRecordStreamHandler() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -873,7 +878,7 @@ function testOnFileHandler() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -925,7 +930,7 @@ function testOnFileByteStreamHandler() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -975,7 +980,7 @@ function testOnFileXmlRecordHandler() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -1031,7 +1036,7 @@ function testOnFileTextWithCaller() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -1087,7 +1092,7 @@ function testOnFileJsonWithCaller() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -1144,7 +1149,7 @@ function testOnFileXmlWithCaller() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -1201,7 +1206,7 @@ function testOnFileCsvWithCaller() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -1258,7 +1263,7 @@ function testOnFileWithCaller() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -1315,7 +1320,7 @@ function testOnFileStreamWithCaller() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -1418,7 +1423,7 @@ function testOnFileDeleteSingleFile() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -1467,7 +1472,7 @@ function testOnFileDeleteWithCaller() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -1538,7 +1543,7 @@ function testNoHandlerMatched() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",

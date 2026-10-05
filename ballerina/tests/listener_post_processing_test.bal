@@ -68,7 +68,7 @@ final ListenerConfiguration POST_PROCESSING_LISTENER_CONFIG = {
     auth: {
         credentials: {
             username: TEST_USERNAME,
-            password: TEST_PASSWORD
+            password: getTestPassword()
         }
     },
     share: "testshare",
@@ -699,7 +699,7 @@ function testOnFileDeleteWithListenerLevelFileNamePattern() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -1198,7 +1198,7 @@ function testOnFileJsonWithLaxDataBinding() returns error? {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",
@@ -1504,7 +1504,7 @@ function testInvalidRegexOnListenerFailsInit() {
     Listener|error invalidPatternListener = new ({
         host: "localhost",
         port: 445,
-        auth: {credentials: {username: TEST_USERNAME, password: TEST_PASSWORD}},
+        auth: {credentials: {username: TEST_USERNAME, password: getTestPassword()}},
         share: "testshare",
         fileNamePattern: "[invalid_listener_pattern"
     });

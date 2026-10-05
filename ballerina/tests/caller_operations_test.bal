@@ -232,7 +232,7 @@ function newCopListener() returns Listener|error {
         auth: {
             credentials: {
                 username: TEST_USERNAME,
-                password: TEST_PASSWORD
+                password: getTestPassword()
             }
         },
         share: "testshare",

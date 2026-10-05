@@ -24,7 +24,7 @@ final Client streamTestClient = check new ({
     auth: {
         credentials: {
             username: TEST_USERNAME,
-            password: TEST_PASSWORD
+            password: getTestPassword()
         }
     }
 });
@@ -317,7 +317,7 @@ final Client laxDataBindingClient = check new ({
     auth: {
         credentials: {
             username: TEST_USERNAME,
-            password: TEST_PASSWORD
+            password: getTestPassword()
         }
     },
     laxDataBinding: true

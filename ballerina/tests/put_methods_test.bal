@@ -23,7 +23,7 @@ final ClientConfiguration testConfig = {
     auth: {
         credentials: {
             username: TEST_USERNAME,
-            password: TEST_PASSWORD
+            password: getTestPassword()
         }
     }
 };
