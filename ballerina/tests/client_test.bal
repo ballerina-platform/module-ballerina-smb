@@ -21,8 +21,8 @@ final Client smbClient = check new ({
     port: 445,
     auth: {
         credentials: {
-            username: "testuser",
-            password: "testpass"
+            username: testUsername,
+            password: testPassword
         }
     },
     share: "testshare"
@@ -88,7 +88,7 @@ function testKerberosClientWithPassword() returns error? {
         auth: {
             credentials: {
                 username: "user",
-                password: "kerbpass"
+                password: testKerberosPassword
             },
             kerberosConfig: {
                 principal: "user@EXAMPLE.COM"

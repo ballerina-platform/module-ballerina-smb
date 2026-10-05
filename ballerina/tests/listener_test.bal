@@ -19,6 +19,13 @@ import ballerina/io;
 import ballerina/lang.runtime;
 import ballerina/test;
 
+const string TEST_HOST = "localhost";
+const int TEST_PORT = 445;
+const string TEST_SHARE = "testshare";
+configurable string testUsername = ?;
+configurable string testPassword = ?;
+configurable string testKerberosPassword = ?;
+
 int createCounter = 0;
 int deleteCounter = 0;
 int totalFilesAdded = 0;
@@ -49,8 +56,8 @@ listener Listener smbListener = check new ({
     port: 445,
     auth: {
         credentials: {
-            username: "testuser",
-            password: "testpass"
+            username: testUsername,
+            password: testPassword
         }
     },
     share: "testshare",
@@ -63,8 +70,8 @@ listener Listener testListener = check new ({
     port: 445,
     auth: {
         credentials: {
-            username: "testuser",
-            password: "testpass"
+            username: testUsername,
+            password: testPassword
         }
     },
     share: "testshare",
@@ -77,8 +84,8 @@ listener Listener stopListener = check new ({
     port: 445,
     auth: {
         credentials: {
-            username: "testuser",
-            password: "testpass"
+            username: testUsername,
+            password: testPassword
         }
     },
     share: "testshare",
@@ -221,8 +228,8 @@ function testSmbListenerOnError() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -544,8 +551,8 @@ function testOnFileTextHandler() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -588,8 +595,8 @@ function testOnFileJsonHandler() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -630,8 +637,8 @@ function testOnFileXmlHandler() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -673,8 +680,8 @@ function testOnFileCsvHandler() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -724,8 +731,8 @@ function testOnFileCsvRecordArrayHandler() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -776,8 +783,8 @@ function testOnFileCsvStringStreamHandler() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -821,8 +828,8 @@ function testOnFileCsvRecordStreamHandler() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -865,8 +872,8 @@ function testOnFileHandler() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -917,8 +924,8 @@ function testOnFileByteStreamHandler() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -967,8 +974,8 @@ function testOnFileXmlRecordHandler() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -1023,8 +1030,8 @@ function testOnFileTextWithCaller() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -1079,8 +1086,8 @@ function testOnFileJsonWithCaller() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -1136,8 +1143,8 @@ function testOnFileXmlWithCaller() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -1193,8 +1200,8 @@ function testOnFileCsvWithCaller() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -1250,8 +1257,8 @@ function testOnFileWithCaller() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -1307,8 +1314,8 @@ function testOnFileStreamWithCaller() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -1410,8 +1417,8 @@ function testOnFileDeleteSingleFile() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -1459,8 +1466,8 @@ function testOnFileDeleteWithCaller() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -1503,4 +1510,50 @@ function testOnFileDeleteWithCaller() returns error? {
     if cleanupResult is error {
         io:println("Failed to clean up /delete_tests directory: ", cleanupResult.message());
     }
+}
+
+int noMatchJsonCounter = 0;
+
+Service jsonOnlyService = service object {
+    remote function onFileJson(json content) returns error? {
+        noMatchJsonCounter += 1;
+    }
+
+    function onError(error err) returns error? {
+        io:println("JSON-only service error: ", err.message());
+    }
+};
+
+@test:Config {
+    groups: ["listener", "no-handler-match"]
+}
+function testNoHandlerMatched() returns error? {
+    noMatchJsonCounter = 0;
+
+    check smbClient->mkdir("no_match_tests");
+
+    Listener noMatchListener = check new ({
+        host: "localhost",
+        port: 445,
+        auth: {
+            credentials: {
+                username: testUsername,
+                password: testPassword
+            }
+        },
+        share: "testshare",
+        pollingInterval: 2,
+        bufferSize: 65536
+    });
+
+    check noMatchListener.attach(jsonOnlyService, "no_match_tests");
+    check noMatchListener.'start();
+    runtime:registerListener(noMatchListener);
+
+    check smbClient->putBytes("/no_match_tests/unhandled_file.dat", "some binary data".toBytes());
+
+    runtime:sleep(5);
+    check noMatchListener.immediateStop();
+
+    test:assertEquals(noMatchJsonCounter, 0, "JSON handler should not be triggered for .dat file");
 }
