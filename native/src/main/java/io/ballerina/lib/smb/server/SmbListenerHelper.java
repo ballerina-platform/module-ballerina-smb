@@ -688,9 +688,13 @@ public class SmbListenerHelper {
         List<Object> args = new ArrayList<>();
         args.add(StringUtils.fromString(deletedFile));
         appendCallerIfDeclared(args, handler, listenerContext);
+        String url = listenerContext != null ? listenerContext.url() : null;
+        String protocol = listenerContext != null ? listenerContext.protocol() : null;
+        Map<String, Object> strandProperties = SmbTracingUtil.createStrandProperties(
+                SmbMetricsUtil.CONTEXT_LISTENER, url, protocol, SmbMetricsUtil.EVENT_TYPE_DELETE);
         try {
             Object result = env.getRuntime().callMethod(context.service(), ON_FILE_DELETE,
-                    new StrandMetadata(handler.isConcurrentSafe(), null), args.toArray());
+                    new StrandMetadata(handler.isConcurrentSafe(), strandProperties), args.toArray());
             if (result instanceof BError bError) {
                 notifyServiceOnError(env, context,
                         new Exception(bError.getErrorMessage().getValue()), listenerContext);
@@ -721,10 +725,10 @@ public class SmbListenerHelper {
         if (handler != null && handler.matchesFileName(fileName)) {
             // Stage 1: Found
             SmbMetricsUtil.reportFileStage(listenerUrl, listenerProtocol, servicePath,
-                    SmbMetricsUtil.FILE_STAGE_FOUND, null, null, null);
+                    SmbMetricsUtil.FILE_STAGE_FOUND, null, null, null, null);
             // Stage 2: Dispatched
             SmbMetricsUtil.reportFileStage(listenerUrl, listenerProtocol, servicePath,
-                    SmbMetricsUtil.FILE_STAGE_DISPATCHED, null, null, handler.name());
+                    SmbMetricsUtil.FILE_STAGE_DISPATCHED, null, null, handler.name(), null);
             invokeContentHandler(env, context, handler, filePath, fileInfo, diskShare, listenerContext,
                     servicePath, listenerUrl, listenerProtocol);
             return;
@@ -733,10 +737,10 @@ public class SmbListenerHelper {
         if (onFileHandler != null && onFileHandler.matchesFileName(fileName)) {
             // Stage 1: Found
             SmbMetricsUtil.reportFileStage(listenerUrl, listenerProtocol, servicePath,
-                    SmbMetricsUtil.FILE_STAGE_FOUND, null, null, null);
+                    SmbMetricsUtil.FILE_STAGE_FOUND, null, null, null, null);
             // Stage 2: Dispatched
             SmbMetricsUtil.reportFileStage(listenerUrl, listenerProtocol, servicePath,
-                    SmbMetricsUtil.FILE_STAGE_DISPATCHED, null, null, onFileHandler.name());
+                    SmbMetricsUtil.FILE_STAGE_DISPATCHED, null, null, onFileHandler.name(), null);
             invokeContentHandler(env, context, onFileHandler, filePath, fileInfo, diskShare, listenerContext,
                     servicePath, listenerUrl, listenerProtocol);
             return;
@@ -744,7 +748,7 @@ public class SmbListenerHelper {
         // No handler matched — file skipped
         SmbMetricsUtil.reportFileStage(listenerUrl, listenerProtocol, servicePath,
                 SmbMetricsUtil.FILE_STAGE_FOUND, SmbMetricsUtil.OUTCOME_SKIPPED,
-                SmbMetricsUtil.FAILURE_NO_HANDLER_MATCHED, null);
+                SmbMetricsUtil.FAILURE_NO_HANDLER_MATCHED, null, null);
     }
 
     private static String getHandlerMethodForExtension(String extension) {
@@ -781,6 +785,9 @@ public class SmbListenerHelper {
             long bindingDurationMs = (System.nanoTime() - bindingStart) / 1_000_000;
             SmbMetricsUtil.reportDatabindingDuration(listenerUrl, listenerProtocol,
                     methodName, SmbMetricsUtil.OUTCOME_FAILURE, bindingDurationMs);
+            SmbMetricsUtil.reportFileStage(listenerUrl, listenerProtocol, servicePath,
+                    SmbMetricsUtil.FILE_STAGE_HANDLED, SmbMetricsUtil.OUTCOME_FAILURE,
+                    SmbMetricsUtil.FAILURE_BINDING_FAILED, methodName, null);
             notifyServiceOnError(env, context, e, listenerContext);
             SmbTracingUtil.finishFileLifecycleSpan(parentCtx);
             return;
@@ -791,6 +798,9 @@ public class SmbListenerHelper {
             long bindingDurationMs = (System.nanoTime() - bindingStart) / 1_000_000;
             SmbMetricsUtil.reportDatabindingDuration(listenerUrl, listenerProtocol,
                     methodName, SmbMetricsUtil.OUTCOME_FAILURE, bindingDurationMs);
+            SmbMetricsUtil.reportFileStage(listenerUrl, listenerProtocol, servicePath,
+                    SmbMetricsUtil.FILE_STAGE_HANDLED, SmbMetricsUtil.OUTCOME_FAILURE,
+                    SmbMetricsUtil.FAILURE_BINDING_FAILED, methodName, null);
             if (content instanceof BError bError) {
                 notifyServiceOnError(env, context, new Exception(bError.getErrorMessage().getValue()),
                         listenerContext);
@@ -837,19 +847,15 @@ public class SmbListenerHelper {
         Thread.startVirtualThread(() -> {
             boolean isSuccess = false;
             try {
-                SmbTracingUtil.addOutcomeToStrandProperties(strandProperties,
-                        SmbMetricsUtil.OUTCOME_SUCCESS, null);
                 Object result = env.getRuntime().callMethod(context.service(), methodName,
                         new StrandMetadata(handler.isConcurrentSafe(), strandProperties), methodArgs);
 
                 if (result instanceof BError bError) {
                     String errorType = bError.getType() != null
                             ? bError.getType().getName() : SmbMetricsUtil.UNKNOWN;
-                    SmbTracingUtil.addOutcomeToStrandProperties(strandProperties,
-                            SmbMetricsUtil.OUTCOME_FAILURE, null);
                     SmbMetricsUtil.reportFileStage(listenerUrl, listenerProtocol, servicePath,
                             SmbMetricsUtil.FILE_STAGE_HANDLED, SmbMetricsUtil.OUTCOME_FAILURE,
-                            errorType, methodName);
+                            errorType, methodName, null);
                     notifyServiceOnError(env, context,
                             new Exception(bError.getErrorMessage().getValue()), listenerContext);
                     if (afterError != null) {
@@ -860,14 +866,12 @@ public class SmbListenerHelper {
                     isSuccess = true;
                     SmbMetricsUtil.reportFileStage(listenerUrl, listenerProtocol, servicePath,
                             SmbMetricsUtil.FILE_STAGE_HANDLED, SmbMetricsUtil.OUTCOME_SUCCESS,
-                            null, methodName);
+                            null, methodName, null);
                 }
             } catch (Exception e) {
-                SmbTracingUtil.addOutcomeToStrandProperties(strandProperties,
-                        SmbMetricsUtil.OUTCOME_FAILURE, null);
                 SmbMetricsUtil.reportFileStage(listenerUrl, listenerProtocol, servicePath,
                         SmbMetricsUtil.FILE_STAGE_HANDLED, SmbMetricsUtil.OUTCOME_FAILURE,
-                        e.getClass().getSimpleName(), methodName);
+                        e.getClass().getSimpleName(), methodName, null);
                 notifyServiceOnError(env, context, e, listenerContext);
                 if (afterError != null) {
                     executePostProcessAction(env, context, afterError, filePath, diskShare, servicePath,
@@ -899,13 +903,13 @@ public class SmbListenerHelper {
             // Stage 4: Cleaned up successfully
             SmbMetricsUtil.reportFileStage(listenerUrl, listenerProtocol, servicePath,
                     SmbMetricsUtil.FILE_STAGE_CLEANED_UP, SmbMetricsUtil.OUTCOME_SUCCESS,
-                    null, handlerName);
+                    null, handlerName, cleanupAction);
         } catch (Exception e) {
             String failureReason = action.isDelete()
                     ? SmbMetricsUtil.FAILURE_DELETE_FAILED : SmbMetricsUtil.FAILURE_MOVE_FAILED;
             SmbMetricsUtil.reportFileStage(listenerUrl, listenerProtocol, servicePath,
                     SmbMetricsUtil.FILE_STAGE_CLEANED_UP, SmbMetricsUtil.OUTCOME_FAILURE,
-                    failureReason, handlerName);
+                    failureReason, handlerName, cleanupAction);
             notifyServiceOnError(env, context, e, listenerContext);
         }
     }
@@ -1197,7 +1201,7 @@ public class SmbListenerHelper {
         String url = listenerContext != null ? listenerContext.url() : null;
         String protocol = listenerContext != null ? listenerContext.protocol() : null;
         Map<String, Object> strandProperties = SmbTracingUtil.createErrorStrandProperties(
-                SmbMetricsUtil.CONTEXT_LISTENER, url, protocol, null, errorType);
+                SmbMetricsUtil.CONTEXT_LISTENER, url, protocol, errorType);
         Object result = env.getRuntime().callMethod(context.service(), ON_ERROR_METHOD,
                 new StrandMetadata(handler.isConcurrentSafe(), strandProperties), args.toArray());
         if (result instanceof BError resultError) {

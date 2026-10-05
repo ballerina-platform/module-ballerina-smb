@@ -129,11 +129,10 @@ public class SmbTracingUtil {
      * @param url       host:port of the remote server
      * @param protocol  the wire protocol
      * @param eventType event type tag value
-     * @param filePath  retained for API compatibility; not added to metric labels
      * @return properties map, or {@code null} if observability is disabled
      */
     public static Map<String, Object> createStrandProperties(String context, String url, String protocol,
-                                                              String eventType, String filePath) {
+                                                              String eventType) {
         if (!ObserveUtils.isObservabilityEnabled()) {
             return null;
         }
@@ -152,14 +151,6 @@ public class SmbTracingUtil {
             log.debug("Failed to create strand properties", t);
             return null;
         }
-    }
-
-    /**
-     * Overload without {@code filePath} for dispatches that have no single source file.
-     */
-    public static Map<String, Object> createStrandProperties(String context, String url, String protocol,
-                                                              String eventType) {
-        return createStrandProperties(context, url, protocol, eventType, null);
     }
 
     /**
@@ -196,10 +187,10 @@ public class SmbTracingUtil {
                 observerContext.addTag(SmbObserverContext.TAG_HANDLER_NAME, handlerName);
             }
             if (fileSize >= 0) {
-                observerContext.addProperty(SmbObserverContext.TAG_FILE_SIZE, fileSize);
+                observerContext.addTag(SmbObserverContext.TAG_FILE_SIZE, String.valueOf(fileSize));
             }
             if (modifiedTime >= 0) {
-                observerContext.addProperty(SmbObserverContext.TAG_FILE_MODIFIED_TIME, modifiedTime);
+                observerContext.addTag(SmbObserverContext.TAG_FILE_MODIFIED_TIME, String.valueOf(modifiedTime));
             }
             Map<String, Object> properties = new HashMap<>();
             properties.put(ObservabilityConstants.KEY_OBSERVER_CONTEXT, observerContext);
@@ -216,15 +207,14 @@ public class SmbTracingUtil {
      * @param context   context tag
      * @param url       host:port
      * @param protocol  protocol string
-     * @param filePath  path of the file involved, or {@code null}
      * @param errorType Ballerina error type name
      * @return properties map, or {@code null} if observability is disabled
      */
     public static Map<String, Object> createErrorStrandProperties(String context, String url, String protocol,
-                                                                   String filePath, String errorType) {
+                                                                   String errorType) {
         try {
             Map<String, Object> props = createStrandProperties(context, url, protocol,
-                    SmbMetricsUtil.EVENT_TYPE_ERROR, filePath);
+                    SmbMetricsUtil.EVENT_TYPE_ERROR);
             if (props != null) {
                 SmbObserverContext ctx = (SmbObserverContext) props.get(
                         ObservabilityConstants.KEY_OBSERVER_CONTEXT);
@@ -407,13 +397,13 @@ public class SmbTracingUtil {
                 return;
             }
             if (fileSize >= 0) {
-                ctx.addProperty(SmbObserverContext.TAG_FILE_SIZE, fileSize);
+                ctx.addTag(SmbObserverContext.TAG_FILE_SIZE, String.valueOf(fileSize));
             }
             if (modifiedTime >= 0) {
-                ctx.addProperty(SmbObserverContext.TAG_FILE_MODIFIED_TIME, modifiedTime);
+                ctx.addTag(SmbObserverContext.TAG_FILE_MODIFIED_TIME, String.valueOf(modifiedTime));
             }
             if (filePath != null) {
-                ctx.addProperty(SmbObserverContext.TAG_FILE_PATH, filePath);
+                ctx.addTag(SmbObserverContext.TAG_FILE_PATH, filePath);
             }
         } catch (Throwable t) {
             log.debug("Failed to add file metadata to strand properties", t);

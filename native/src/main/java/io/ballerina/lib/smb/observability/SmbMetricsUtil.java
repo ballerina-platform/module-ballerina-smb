@@ -184,7 +184,8 @@ public class SmbMetricsUtil {
      * @param handlerName   handler method name, or {@code null}
      */
     public static void reportFileStage(String url, String protocol, String watchedPath, String fileStage,
-                                       String outcome, String errorType, String handlerName) {
+                                       String outcome, String errorType, String handlerName,
+                                       String cleanupAction) {
         if (!ObserveUtils.isMetricsEnabled()) {
             return;
         }
@@ -196,6 +197,8 @@ public class SmbMetricsUtil {
             observerContext.addTag(SmbObserverContext.TAG_OUTCOME, outcome != null ? outcome : NONE);
             observerContext.addTag(SmbObserverContext.TAG_ERROR_TYPE, errorType != null ? errorType : NONE);
             observerContext.addTag(SmbObserverContext.TAG_HANDLER_NAME, handlerName != null ? handlerName : NONE);
+            observerContext.addTag(SmbObserverContext.TAG_CLEANUP_ACTION,
+                    cleanupAction != null ? cleanupAction : NONE);
             String host = getInstanceUrl();
             observerContext.addTag(SmbObserverContext.TAG_INSTANCE_URL, host != null ? host : NONE);
             metricRegistry.counter(new MetricId(FILE_CONNECTOR_NAME + "_" + METRIC_FILE_EVENTS[0],
