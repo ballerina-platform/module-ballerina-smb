@@ -231,8 +231,8 @@ function newCopListener() returns Listener|error {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: TEST_USERNAME,
+                password: TEST_PASSWORD
             }
         },
         share: "testshare",

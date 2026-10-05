@@ -157,7 +157,7 @@ function testKerberosListenerWithPasswordCredentials() returns error? {
         auth: {
             credentials: {
                 username: "user",
-                password: "kerbpass"
+                password: TEST_KERBEROS_PASSWORD
             },
             kerberosConfig: {
                 principal: "user@EXAMPLE.COM"
@@ -251,8 +251,8 @@ function testAttachWithStringArrayNameReturnsError() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: TEST_USERNAME,
+                password: TEST_PASSWORD
             }
         },
         share: "testshare",
@@ -345,8 +345,8 @@ function testNotifyServiceOnErrorWhenOnErrorReturnsError() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: TEST_USERNAME,
+                password: TEST_PASSWORD
             }
         },
         share: "testshare",

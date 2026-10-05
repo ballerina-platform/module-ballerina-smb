@@ -22,8 +22,8 @@ final ClientConfiguration testConfig = {
     share: "testshare",
     auth: {
         credentials: {
-            username: "testuser",
-            password: "testpass"
+            username: TEST_USERNAME,
+            password: TEST_PASSWORD
         }
     }
 };

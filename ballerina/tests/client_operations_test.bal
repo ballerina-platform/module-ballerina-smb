@@ -174,8 +174,8 @@ function testClientEmptyDialects() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: TEST_USERNAME,
+                password: TEST_PASSWORD
             }
         },
         share: "testshare",
@@ -198,8 +198,8 @@ function testGetBytesAsStreamAfterClose() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: TEST_USERNAME,
+                password: TEST_PASSWORD
             }
         },
         share: "testshare"
@@ -226,8 +226,8 @@ function testGetCsvAsStreamAfterClose() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: TEST_USERNAME,
+                password: TEST_PASSWORD
             }
         },
         share: "testshare"
@@ -286,8 +286,8 @@ function testCsvStreamHeaderOnlyFile() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: "testuser",
-                password: "testpass"
+                username: TEST_USERNAME,
+                password: TEST_PASSWORD
             }
         },
         share: "testshare",
