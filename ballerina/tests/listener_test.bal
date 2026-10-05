@@ -22,14 +22,9 @@ import ballerina/test;
 const string TEST_HOST = "localhost";
 const int TEST_PORT = 445;
 const string TEST_SHARE = "testshare";
-const string TEST_USERNAME = "testuser";
-function getTestPassword() returns string {
-    return "testpass";
-}
-
-function getTestKerberosPassword() returns string {
-    return "kerbpass";
-}
+configurable string testUsername = ?;
+configurable string testPassword = ?;
+configurable string testKerberosPassword = ?;
 
 int createCounter = 0;
 int deleteCounter = 0;
@@ -61,8 +56,8 @@ listener Listener smbListener = check new ({
     port: 445,
     auth: {
         credentials: {
-            username: TEST_USERNAME,
-            password: getTestPassword()
+            username: testUsername,
+            password: testPassword
         }
     },
     share: "testshare",
@@ -75,8 +70,8 @@ listener Listener testListener = check new ({
     port: 445,
     auth: {
         credentials: {
-            username: TEST_USERNAME,
-            password: getTestPassword()
+            username: testUsername,
+            password: testPassword
         }
     },
     share: "testshare",
@@ -89,8 +84,8 @@ listener Listener stopListener = check new ({
     port: 445,
     auth: {
         credentials: {
-            username: TEST_USERNAME,
-            password: getTestPassword()
+            username: testUsername,
+            password: testPassword
         }
     },
     share: "testshare",
@@ -233,8 +228,8 @@ function testSmbListenerOnError() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -556,8 +551,8 @@ function testOnFileTextHandler() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -600,8 +595,8 @@ function testOnFileJsonHandler() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -642,8 +637,8 @@ function testOnFileXmlHandler() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -685,8 +680,8 @@ function testOnFileCsvHandler() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -736,8 +731,8 @@ function testOnFileCsvRecordArrayHandler() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -788,8 +783,8 @@ function testOnFileCsvStringStreamHandler() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -833,8 +828,8 @@ function testOnFileCsvRecordStreamHandler() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -877,8 +872,8 @@ function testOnFileHandler() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -929,8 +924,8 @@ function testOnFileByteStreamHandler() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -979,8 +974,8 @@ function testOnFileXmlRecordHandler() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -1035,8 +1030,8 @@ function testOnFileTextWithCaller() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -1091,8 +1086,8 @@ function testOnFileJsonWithCaller() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -1148,8 +1143,8 @@ function testOnFileXmlWithCaller() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -1205,8 +1200,8 @@ function testOnFileCsvWithCaller() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -1262,8 +1257,8 @@ function testOnFileWithCaller() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -1319,8 +1314,8 @@ function testOnFileStreamWithCaller() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -1422,8 +1417,8 @@ function testOnFileDeleteSingleFile() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -1471,8 +1466,8 @@ function testOnFileDeleteWithCaller() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",
@@ -1542,8 +1537,8 @@ function testNoHandlerMatched() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",

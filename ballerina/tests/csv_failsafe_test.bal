@@ -24,8 +24,8 @@ final ClientConfiguration csvFailSafeMetadataConfig = {
     share: "testshare",
     auth: {
         credentials: {
-            username: TEST_USERNAME,
-            password: getTestPassword()
+            username: testUsername,
+            password: testPassword
         }
     },
     csvFailSafe: {
@@ -39,8 +39,8 @@ final ClientConfiguration csvFailSafeRawConfig = {
     share: "testshare",
     auth: {
         credentials: {
-            username: TEST_USERNAME,
-            password: getTestPassword()
+            username: testUsername,
+            password: testPassword
         }
     },
     csvFailSafe: {
@@ -54,8 +54,8 @@ final ClientConfiguration csvFailSafeRawAndMetadataConfig = {
     share: "testshare",
     auth: {
         credentials: {
-            username: TEST_USERNAME,
-            password: getTestPassword()
+            username: testUsername,
+            password: testPassword
         }
     },
     csvFailSafe: {
@@ -69,8 +69,8 @@ final ClientConfiguration csvFailSafeWithLaxConfig = {
     share: "testshare",
     auth: {
         credentials: {
-            username: TEST_USERNAME,
-            password: getTestPassword()
+            username: testUsername,
+            password: testPassword
         }
     },
     laxDataBinding: true,
@@ -151,8 +151,8 @@ function testOnFileCsvStreamWithFailSafe() returns error? {
         port: 445,
         auth: {
             credentials: {
-                username: TEST_USERNAME,
-                password: getTestPassword()
+                username: testUsername,
+                password: testPassword
             }
         },
         share: "testshare",

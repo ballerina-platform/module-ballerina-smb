@@ -23,8 +23,8 @@ final Client streamTestClient = check new ({
     share: "testshare",
     auth: {
         credentials: {
-            username: TEST_USERNAME,
-            password: getTestPassword()
+            username: testUsername,
+            password: testPassword
         }
     }
 });
@@ -316,8 +316,8 @@ final Client laxDataBindingClient = check new ({
     share: "testshare",
     auth: {
         credentials: {
-            username: TEST_USERNAME,
-            password: getTestPassword()
+            username: testUsername,
+            password: testPassword
         }
     },
     laxDataBinding: true
