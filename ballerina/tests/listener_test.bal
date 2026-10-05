@@ -1520,7 +1520,7 @@ function testOnFileDeleteWithCaller() returns error? {
 int noMatchJsonCounter = 0;
 
 Service jsonOnlyService = service object {
-    remote function onFileJson(json content, FileInfo fileInfo) returns error? {
+    remote function onFileJson(json content) returns error? {
         noMatchJsonCounter += 1;
     }
 
