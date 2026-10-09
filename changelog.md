@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Added
+
+- [Add observability support with metrics and tracing for the SMB client and listener](https://github.com/ballerina-platform/module-ballerina-smb/pull/34)
+
 ### Changed
 - [[#9132] Updated Keywords and Reformat README for Connector Store Discoverability](https://github.com/ballerina-platform/ballerina-library/issues/9132)
 
