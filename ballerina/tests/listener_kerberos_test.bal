@@ -45,7 +45,7 @@ function testKerberosListenerNoKeytabNoCredentials() returns error? {
             test:assertFail("onFile should not be invoked when Kerberos auth is misconfigured");
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             kerbNoKeytabNoCredsCounter += 1;
             io:println("Expected kerberos error (no keytab, no creds): ", err.message());
         }
@@ -94,7 +94,7 @@ function testKerberosListenerWithInvalidKeytab() returns error? {
             test:assertFail("onFile should not be invoked when Kerberos auth is misconfigured");
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             kerbInvalidKeytabCounter += 1;
             io:println("Expected kerberos error (invalid keytab): ", err.message());
         }
@@ -144,7 +144,7 @@ function testKerberosListenerWithPasswordCredentials() returns error? {
             test:assertFail("onFile should not be invoked when Kerberos auth is misconfigured");
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             kerbPasswordBasedCounter += 1;
             io:println("Expected kerberos error (password-based): ", err.message());
         }
@@ -195,7 +195,7 @@ function testKerberosListenerTicketCacheFallback() returns error? {
             test:assertFail("onFile should not be invoked when Kerberos auth is misconfigured");
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             kerbTicketCacheCounter += 1;
             io:println("Expected kerberos error (ticket-cache fallback): ", err.message());
         }
@@ -281,7 +281,7 @@ function testNotifyServicesOnErrorWhenOnErrorReturnsError() returns error? {
             test:assertFail("onFile should not be invoked when Kerberos auth is misconfigured");
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             kerbOnErrorReturnsErrCounter += 1;
             // Returning an error from onError exercises the
             // `if (result instanceof BError)` branch inside notifyServicesOnError.
@@ -330,7 +330,7 @@ function testNotifyServiceOnErrorWhenOnErrorReturnsError() returns error? {
             return error("intentional handler error");
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             handlerOnErrorRetErrCounter += 1;
             // Returning an error from onError covers the
             // `if (result instanceof BError)` branch inside notifyServiceOnError.

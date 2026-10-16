@@ -146,7 +146,7 @@ Service errorHandlingService = service object {
         io:println("Error handling service file handler triggered");
     }
 
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("onError triggered: ", err.message());
         errorCounter += 1;
         capturedErrorMessage = err.message();
@@ -357,7 +357,7 @@ Service contentHandlerService = service object {
         capturedBinaryFileName = fileInfo.name;
     }
 
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("Content handler error: ", err.message());
     }
 };
@@ -369,7 +369,7 @@ Service csvRecordArrayService = service object {
         capturedCsvRecordArrayFileName = fileInfo.name;
     }
 
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("CSV record[] handler error: ", err.message());
     }
 };
@@ -389,7 +389,7 @@ Service csvStringStreamService = service object {
         }
     }
 
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("CSV stream<string[]> handler error: ", err.message());
     }
 };
@@ -408,7 +408,7 @@ Service csvRecordStreamService = service object {
         }
     }
 
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("CSV stream<record{}> handler error: ", err.message());
     }
 };
@@ -430,7 +430,7 @@ Service binaryStreamService = service object {
         }
     }
 
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("Binary stream handler error: ", err.message());
     }
 };
@@ -442,7 +442,7 @@ Service xmlRecordService = service object {
         capturedXmlRecordFileName = fileInfo.name;
     }
 
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("XML record handler error: ", err.message());
     }
 };
@@ -455,7 +455,7 @@ Service callerTextService = service object {
         callerTextUsed = result is ();
     }
 
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("Caller text handler error: ", err.message());
     }
 };
@@ -469,7 +469,7 @@ Service callerJsonService = service object {
         callerJsonUsed = result is ();
     }
 
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("Caller json handler error: ", err.message());
     }
 };
@@ -483,7 +483,7 @@ Service callerXmlService = service object {
         callerXmlUsed = result is ();
     }
 
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("Caller xml handler error: ", err.message());
     }
 };
@@ -497,7 +497,7 @@ Service callerCsvService = service object {
         callerCsvUsed = result is ();
     }
 
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("Caller csv handler error: ", err.message());
     }
 };
@@ -511,7 +511,7 @@ Service callerBinaryService = service object {
         callerBinaryUsed = result is ();
     }
 
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("Caller binary handler error: ", err.message());
     }
 };
@@ -533,7 +533,7 @@ Service callerStreamService = service object {
         }
     }
 
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("Caller stream handler error: ", err.message());
     }
 };
@@ -1376,7 +1376,7 @@ Service onFileDeleteService = service object {
         io:println("File added: ", fileInfo.name);
     }
 
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("onFileDelete service error: ", err.message());
     }
 };
@@ -1394,7 +1394,7 @@ Service onDeleteWithCallerService = service object {
         io:println("File added: ", fileInfo.name);
     }
 
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("onDeleteWithCaller service error: ", err.message());
     }
 };
@@ -1519,7 +1519,7 @@ Service jsonOnlyService = service object {
         noMatchJsonCounter += 1;
     }
 
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("JSON-only service error: ", err.message());
     }
 };

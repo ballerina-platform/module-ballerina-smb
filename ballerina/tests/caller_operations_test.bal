@@ -105,7 +105,7 @@ Service copCrudService = service object {
         check caller->delete(cDst);
     }
 
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("copCrudService error: ", err.message());
     }
 };
@@ -117,7 +117,7 @@ Service copJsonGetService = service object {
         json|Error r = caller->getJson(fileInfo.path);
         copGetJsonOk = r is json;
     }
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("copJsonGetService error: ", err.message());
     }
 };
@@ -129,7 +129,7 @@ Service copXmlGetService = service object {
         xml|Error r = caller->getXml(fileInfo.path);
         copGetXmlOk = r is xml;
     }
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("copXmlGetService error: ", err.message());
     }
 };
@@ -146,7 +146,7 @@ Service copCsvGetService = service object {
             check streamR.close();
         }
     }
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("copCsvGetService error: ", err.message());
     }
 };
@@ -162,7 +162,7 @@ Service copBytesStreamGetService = service object {
         }
         check content.close();
     }
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("copBytesStreamGetService error: ", err.message());
     }
 };
@@ -186,7 +186,7 @@ Service copPutBytesStreamService = service object {
             }
         }
     }
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("copPutBytesStreamService error: ", err.message());
     }
 };
@@ -207,7 +207,7 @@ Service copPutCsvStreamService = service object {
             copPutCsvStreamVerified = readBack is string[][];
         }
     }
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("copPutCsvStreamService error: ", err.message());
     }
 };
@@ -219,7 +219,7 @@ Service copCloseCallerService = service object {
         Error? r = caller->close();
         copCallerCloseOk = r is ();
     }
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         io:println("copCloseCallerService error: ", err.message());
     }
 };

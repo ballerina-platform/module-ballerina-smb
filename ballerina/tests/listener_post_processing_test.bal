@@ -447,7 +447,7 @@ function testAfterProcessDeleteOnBinaryFile() returns error? {
             afterProcessBinaryDeleteCounter += 1;
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("Binary delete service error: ", err.message());
         }
     };
@@ -491,7 +491,7 @@ function testAfterProcessDeleteOnJsonFile() returns error? {
             afterProcessJsonDeleteCounter += 1;
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("JSON delete service error: ", err.message());
         }
     };
@@ -537,7 +537,7 @@ function testAfterErrorMoveOnBinaryFile() returns error? {
             return error("simulated binary processing error");
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("Binary error move service error: ", err.message());
         }
     };
@@ -590,7 +590,7 @@ function testOnFileDeleteWithMatchingFunctionConfigPattern() returns error? {
         remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("Pattern delete service error: ", err.message());
         }
     };
@@ -638,7 +638,7 @@ function testOnFileDeleteWithNonMatchingFunctionConfigPattern() returns error? {
         remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("No-match pattern service error: ", err.message());
         }
     };
@@ -683,7 +683,7 @@ function testOnFileDeleteWithListenerLevelFileNamePattern() returns error? {
         remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("Listener pattern delete service error: ", err.message());
         }
     };
@@ -784,7 +784,7 @@ function testOnFileDeleteReturnsError() returns error? {
         remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("Expected error from onFileDelete handler: ", err.message());
         }
     };
@@ -828,7 +828,7 @@ function testOnFileDeleteWithInvalidRegexPattern() returns error? {
         remote function onFile(byte[] content, FileInfo fileInfo) returns error? {
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("Invalid regex service error: ", err.message());
         }
     };
@@ -857,7 +857,7 @@ function testOnFileHandlerWithNoContentParameter() returns error? {
             noParamHandlerFileCounter += 1;
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("No-param handler error: ", err.message());
         }
     };
@@ -906,7 +906,7 @@ function testFallbackFromSpecificHandlerToOnFile() returns error? {
             fallbackToOnFileCounter += 1;
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("Fallback service error: ", err.message());
         }
     };
@@ -950,7 +950,7 @@ function testAfterProcessMoveWithTrailingSlashDestination() returns error? {
             afterProcessMoveTrailingSlashCounter += 1;
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("Trailing slash move error: ", err.message());
         }
     };
@@ -999,7 +999,7 @@ function testAfterProcessDeleteOnXmlFile() returns error? {
             afterProcessXmlDeleteCounter += 1;
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("XML delete service error: ", err.message());
         }
     };
@@ -1043,7 +1043,7 @@ function testAfterProcessDeleteOnCsvFile() returns error? {
             afterProcessCsvDeleteCounter += 1;
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("CSV delete service error: ", err.message());
         }
     };
@@ -1087,7 +1087,7 @@ function testAfterProcessMoveCreatesDestinationDirectory() returns error? {
             afterProcessMoveNewDirCounter += 1;
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("Move new dir service error: ", err.message());
         }
     };
@@ -1136,7 +1136,7 @@ function testMalformedJsonTriggersBErrorPath() returns error? {
             malformedJsonOnFileCounter += 1;
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             malformedJsonOnErrorCounter += 1;
             io:println("Malformed JSON error (expected): ", err.message());
         }
@@ -1182,7 +1182,7 @@ function testOnFileJsonWithLaxDataBinding() returns error? {
             afterProcessLaxJsonCounter += 1;
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("Lax JSON service error: ", err.message());
         }
     };
@@ -1242,7 +1242,7 @@ function testAfterErrorMoveOnXmlFile() returns error? {
             return error("simulated XML processing error");
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("XML error move service error: ", err.message());
         }
     };
@@ -1298,7 +1298,7 @@ function testAnonymousAuthWithPublicShare() returns error? {
             anonymousAuthFileCounter += 1;
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             anonymousAuthErrorCounter += 1;
         }
     };
@@ -1343,7 +1343,7 @@ function testAnonymousListenerWithSMB3DialectsFails() returns error? {
             test:assertFail("onFileText should not be invoked when dialect configuration is incompatible");
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             anonymousDialectErrorCounter += 1;
             anonymousDialectErrorMessage = err.message();
         }
@@ -1387,7 +1387,7 @@ function testFileWithoutExtension() returns error? {
             noExtensionFileCounter += 1;
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("No-extension file service error: ", err.message());
         }
     };
@@ -1429,7 +1429,7 @@ function testDetachServiceCallsDeregister() returns error? {
             detachServiceCounter += 1;
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("Detach service error: ", err.message());
         }
     };
@@ -1477,7 +1477,7 @@ function testInvalidRegexOnContentHandlerFailsAttach() returns error? {
         remote function onFileText(string content, FileInfo fileInfo) returns error? {
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("Invalid regex content handler error: ", err.message());
         }
     };
@@ -1536,7 +1536,7 @@ function testCsvStringArrayHandlerWithEscapedQuotes() returns error? {
             csvEscapedQuotesCounter += 1;
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("CSV escaped quotes service error: ", err.message());
         }
     };
@@ -1579,7 +1579,7 @@ function testMissingAuthCredentialsTriggersError() returns error? {
             io:println("Should not be triggered");
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             missingAuthErrorCounter += 1;
             io:println("Expected auth error: ", err.message());
         }
@@ -1624,7 +1624,7 @@ function testHandlerPanicTriggersVirtualThreadCatch() returns error? {
             panic error("forced panic inside handler");
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             panicHandlerErrorCounter += 1;
         }
     };
@@ -1671,7 +1671,7 @@ function testMoveFailureWhenDestPathIsFile() returns error? {
         remote function onFileText(string content, FileInfo fileInfo) returns error? {
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             moveConflictErrorCounter += 1;
         }
     };
@@ -1720,7 +1720,7 @@ function testEmptyMoveToDestination() returns error? {
             emptyMoveToCounter += 1;
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("Empty moveTo error: ", err.message());
         }
     };
@@ -1770,7 +1770,7 @@ function testDoubleSlashMoveToCoversEmptyPathSegment() returns error? {
             doubleSlashMoveCounter += 1;
         }
 
-        function onError(error err) returns error? {
+        remote function onError(error err) returns error? {
             io:println("Double-slash move error (expected): ", err.message());
         }
     };

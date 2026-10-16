@@ -263,7 +263,7 @@ Service cecHeaderOnlyCsvService = service object {
         }
     }
 
-    function onError(error err) returns error? {
+    remote function onError(error err) returns error? {
         // error logic
     }
 };
