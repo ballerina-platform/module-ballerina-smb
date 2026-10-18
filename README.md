@@ -15,6 +15,12 @@ The client connects to a share to read, write, move, copy, and list files. The l
 
 The module supports SMB dialects `2.0.2` through `3.1.1`, NTLMv2 and Kerberos authentication, message signing, and data encryption. All paths are relative to the configured share.
 
+### Key Features
+
+- Connect to a share to read, write, move, copy, and list files
+- Poll a directory and dispatch added or deleted files to a service
+- Support for SMB dialects `2.0.2`–`3.1.1`, NTLMv2/Kerberos authentication, message signing, and encryption
+
 ## Quickstart
 
 To use the `smb` module in your Ballerina application, follow the steps below.

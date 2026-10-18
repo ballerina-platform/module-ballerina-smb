@@ -8,8 +8,8 @@ The module supports SMB dialects `2.0.2` through `3.1.1`, NTLMv2 and Kerberos au
 
 ### Key Features
 
-- Connect to a share and reading, writing, moving, copying, and listing files
-- Poll a directory and dispatching added or deleted files to a service
+- Connect to a share to read, write, move, copy, and list files
+- Poll a directory and dispatch added or deleted files to a service
 - Support for SMB dialects `2.0.2`–`3.1.1`, NTLMv2/Kerberos authentication, message signing, and encryption
 
 ## Quickstart
