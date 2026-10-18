@@ -5,16 +5,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Changed
+
+- [[#2804] Shorten the module summary so it is not truncated in the WSO2 Integrator connector view](https://github.com/wso2/product-integrator/issues/2804)
+
+## [2.2.0] - 2026-10-16
+
+### Changed
+
+- [Migrate to Ballerina Swan Lake Update 14 and Java 25](https://github.com/ballerina-platform/module-ballerina-smb/pull/45)
+
+## [2.1.0] - 2026-10-13
+
 ### Added
 
 - [Add observability support with metrics and tracing for the SMB client and listener](https://github.com/ballerina-platform/module-ballerina-smb/pull/34)
 
 ### Changed
-- [[#9132] Updated Keywords and Reformat README for Connector Store Discoverability](https://github.com/ballerina-platform/ballerina-library/issues/9132)
-- [[#2804] Shorten the module summary so it is not truncated in the WSO2 Integrator connector view](https://github.com/wso2/product-integrator/issues/2804)
+
+- [Remove the Bouncy Castle dependency](https://github.com/ballerina-platform/module-ballerina-smb/pull/41)
 
 ### Fixed
+
 - [[#9126] Conflicting jar files (ballerina-rt vs slf4j-api) on build](https://github.com/ballerina-platform/ballerina-library/issues/9126)
+
+## [2.0.2] - 2026-09-08
+
+### Added
+
+- [Add WSO2 Integrator trigger metadata](https://github.com/ballerina-platform/module-ballerina-smb/pull/33)
+
+### Changed
+
+- [[#9132] Updated Keywords and Reformat README for Connector Store Discoverability](https://github.com/ballerina-platform/ballerina-library/issues/9132)
 
 ## [2.0.1] - 2026-08-06
 
