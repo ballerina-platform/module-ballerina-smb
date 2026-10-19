@@ -1,0 +1,4 @@
+# ballerina:14 is a false positive: the flagged `auth.credentials.password` record field is populated from
+# `configurable string ... = ?;` (no value in source), so no secret is hardcoded. The rule matches the field name.
+[rule]
+exclude = ["ballerina:14"]
